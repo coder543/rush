@@ -1,0 +1,24 @@
+- aggressive autocomplete
+- better scripting syntax
+- who even needs tmux
+- pipe objects, not text
+- non-sucky built-ins
+- did you say Windows support!?
+- Linux too, obv.
+- cd directly into compressed archives
+- cat images to terminal (not exactly new, but would be awesome)
+- dynamically refreshing commands
+	- if you `ls` a directory, updates to that directory should rewrite the previous output of `ls`. maybe this should require a flag.
+- have a TUI file browser built-in
+
+$files = ls
+$num = len $files
+if $num > 3 {
+	echo "awesome folder here"
+	$num += 5
+	echo "it would be more awesome with $num files!"
+} else {
+	echo "lame folder here"
+}
+
+or maybe commands should be treated as function calls? like `echo("does this work?")`

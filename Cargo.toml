@@ -1,0 +1,8 @@
+[package]
+authors = ["Josh Leverette <coder543@gmail.com>"]
+name = "rush"
+version = "0.1.0"
+
+[dependencies]
+pancurses = "0.11.0"
+# rustyline = "1.0.0"
