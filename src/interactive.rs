@@ -34,27 +34,29 @@ pub fn input_loop(screen: Window) -> PResult {
         print_buffer(&screen, &output_buffer)?;
         print_command(&screen, &command_buffer)?;
         screen.refresh().unwrap();
-        let next = screen.getch().unwrap();
-        match next {
-            Input::KeyBackspace |
-            Input::Character('\x08') |
-            Input::Character('\x7f') => {
-                command_buffer.pop();
+        let maybe_next = screen.getch();
+        if let Some(next) = maybe_next {
+            match next {
+                Input::KeyBackspace |
+                Input::Character('\x08') |
+                Input::Character('\x7f') => {
+                    command_buffer.pop();
+                }
+                Input::Character('\n') => {
+                    output_buffer.push_str("$ ");
+                    let output = run_expression(&command_buffer)?;
+                    output_buffer.push_str(&output.command);
+                    output_buffer.push_str("\n");
+                    output_buffer.push_str(&output.interleaved);
+                    output_buffer.push_str("\n");
+                    command_buffer.clear();
+                }
+                Input::Character(chr) => {
+                    println!("char: {:?}", chr);
+                    command_buffer.push(chr);
+                }
+                _ => {}
             }
-            Input::Character('\n') => {
-                output_buffer.push_str("$ ");
-                let output = run_expression(&command_buffer)?;
-                output_buffer.push_str(&output.command);
-                output_buffer.push_str("\n");
-                output_buffer.push_str(&output.interleaved);
-                output_buffer.push_str("\n");
-                command_buffer.clear();
-            }
-            Input::Character(chr) => {
-                println!("char: {:?}", chr);
-                command_buffer.push(chr);
-            }
-            _ => {}
-        };
+        }
     }
 }
