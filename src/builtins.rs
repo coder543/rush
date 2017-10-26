@@ -18,7 +18,9 @@ pub fn echo(buffer: &str, args: Vec<&str>) -> Result<ExpressionOutput, String> {
 pub fn cat(buffer: &str, args: Vec<&str>) -> Result<ExpressionOutput, String> {
     let mut output = String::new();
     for file in args {
-        File::open(file).and_then(|mut file| file.read_to_string(&mut output)).map_err(|err| format!("Error reading {}: {}", file, err))?;
+        File::open(file)
+            .and_then(|mut file| file.read_to_string(&mut output))
+            .map_err(|err| format!("Error reading {}: {}", file, err))?;
     }
     Ok(ExpressionOutput {
         command: buffer.to_string(),
