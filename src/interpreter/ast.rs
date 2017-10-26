@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use interpreter::tokenizer::Ident;
+
 pub struct Expr {
     raw: String,
     node: Node,
@@ -12,8 +14,6 @@ pub enum Node {
     Op(Box<Operator>),
     Function(Box<Function>),
 }
-
-pub struct Ident(String);
 
 pub enum Operator {
     Call(Ident, Vec<Expr>),
@@ -32,5 +32,5 @@ pub enum Operator {
 pub struct Function {
     name: String,
     args: Vec<Ident>,
-    body: Expr
+    body: Expr,
 }
