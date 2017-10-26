@@ -9,7 +9,10 @@ pub enum Node {
     Ident(Ident),
     Int(i64),
     Float(f64),
+    Str(String),
     Op(Box<Operator>),
+    For(Box<For>),
+    While(Box<While>),
     Function(Box<Function>),
 }
 
@@ -30,7 +33,18 @@ pub enum Operator {
 }
 
 pub struct Function {
-    name: String,
+    name: Ident,
     args: Vec<Ident>,
+    body: Expr
+}
+
+pub struct For {
+    loopvar: Ident,
+    iterator: Expr,
+    body: Expr
+}
+
+pub struct While {
+    condition: Expr,
     body: Expr
 }
