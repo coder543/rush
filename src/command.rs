@@ -1,5 +1,7 @@
 use std::time::Instant;
 
+use builtins::echo;
+
 // Obviously just a rough sketch
 // These fields will need to be rethought
 pub struct ExpressionOutput {
@@ -12,18 +14,15 @@ pub struct ExpressionOutput {
 }
 
 pub fn run_expression(buffer: &str) -> Result<ExpressionOutput, &'static str> {
-    let stdout;
-    if buffer.starts_with("echo") {
-        stdout = &buffer[5..]
-    } else {
-        stdout = ""
-    }
-    Ok(ExpressionOutput {
-        command: buffer.to_string(),
-        stdout: stdout.to_string(),
-        stderr: "".to_string(),
-        interleaved: stdout.to_string(),
-        started: Instant::now(),
-        completed: Instant::now(),
-    })
+    let mut words = buffer.split(' ');
+    let command = words.next();
+    let args = words.collect();
+
+    command
+        .and_then(|command| match command {
+            "echo" => Some(echo(buffer, args)),
+            _ => None,
+        })
+        .or(Some(Err("could not find command")))
+        .unwrap()
 }

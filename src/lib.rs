@@ -9,6 +9,8 @@ use interactive::input_loop;
 
 mod command;
 
+mod builtins;
+
 pub fn start_interactive() {
     let screen = pancurses::initscr();
     pancurses::noecho();

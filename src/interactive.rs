@@ -43,12 +43,24 @@ pub fn input_loop(screen: Window) -> PResult {
                     command_buffer.pop();
                 }
                 Input::Character('\n') => {
-                    output_buffer.push_str("$ ");
-                    let output = run_expression(&command_buffer)?;
-                    output_buffer.push_str(&output.command);
-                    output_buffer.push_str("\n");
-                    output_buffer.push_str(&output.interleaved);
-                    output_buffer.push_str("\n");
+                    if command_buffer == "" {
+                        continue;
+                    }
+                    output_buffer += "$ ";
+                    let output = run_expression(&command_buffer);
+                    match output {
+                        Ok(output) => {
+                            output_buffer += &output.command;
+                            output_buffer += "\n";
+                            output_buffer += &output.interleaved;
+                        }
+                        Err(message) => {
+                            output_buffer += &command_buffer;
+                            output_buffer += "\n";
+                            output_buffer += message;
+                        }
+                    }
+                    output_buffer += "\n";
                     command_buffer.clear();
                 }
                 Input::Character(chr) => {
