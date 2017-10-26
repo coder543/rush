@@ -6,3 +6,13 @@ version = "0.1.0"
 [dependencies]
 pancurses = "0.11.0"
 # rustyline = "1.0.0"
+
+[profile.dev]
+codegen-units=32
+
+[profile.release]
+lto = true
+
+[[bin]]
+name = "rush"
+doc = false

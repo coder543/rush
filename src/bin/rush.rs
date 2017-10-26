@@ -1,4 +1,5 @@
+extern crate rush;
 
 fn main() {
-    println!("hello, world!")
+    rush::interactive();
 }
