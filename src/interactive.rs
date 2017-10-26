@@ -39,7 +39,7 @@ pub fn input_loop(screen: Window) -> PResult {
             Input::KeyBackspace |
             Input::Character('\x08') |
             Input::Character('\x7f') => {
-                command_buffer.pop().unwrap();
+                command_buffer.pop();
             }
             Input::Character('\n') => {
                 output_buffer.push_str("$ ");
