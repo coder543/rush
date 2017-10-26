@@ -4,6 +4,8 @@
 - implement a TUI scrollbar for the output buffer that can be dragged with a mouse
 - add action boxes, like one for each command's output to save that output to a file, and one for the whole buffer
 	- when clicked, the action would expand into a dropdown menu, with actions like save, which would then trigger a text input for a file name
+	- have a runtime stats box for each executed command
+- input line can expand to be multiline (up to 3 or 5) and scrollable using shift-enter or incomplete ASTs.
 - pipe objects, not text
 - non-sucky built-ins
 - did you say Windows support!?
