@@ -7,9 +7,7 @@ mod windowext;
 mod interactive;
 use interactive::input_loop;
 
-mod command;
-
-mod builtins;
+mod interpreter;
 
 pub fn start_interactive() {
     let screen = pancurses::initscr();

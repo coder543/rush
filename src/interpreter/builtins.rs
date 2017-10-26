@@ -1,4 +1,4 @@
-use command::ExpressionOutput;
+use interpreter::command::ExpressionOutput;
 use std::time::Instant;
 use std::fs::File;
 use std::io::Read;

@@ -1,6 +1,6 @@
 use pancurses::{Input, Window};
 use errext::{ErrExt, PResult};
-use command::run_expression;
+use interpreter::command::run_expression;
 
 fn print_buffer(screen: &Window, buffer: &str) -> PResult {
     let height = (screen.get_max_y() - 3) as usize;

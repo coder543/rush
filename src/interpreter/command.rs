@@ -1,7 +1,7 @@
 use std::time::Instant;
 use pancurses;
 
-use builtins::*;
+use interpreter::builtins::*;
 
 // Obviously just a rough sketch
 // These fields will need to be rethought
