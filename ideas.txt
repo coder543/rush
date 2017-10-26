@@ -1,6 +1,9 @@
 - aggressive autocomplete
 - better scripting syntax
 - who even needs tmux
+- implement a TUI scrollbar for the output buffer that can be dragged with a mouse
+- add action boxes, like one for each command's output to save that output to a file, and one for the whole buffer
+	- when clicked, the action would expand into a dropdown menu, with actions like save, which would then trigger a text input for a file name
 - pipe objects, not text
 - non-sucky built-ins
 - did you say Windows support!?
