@@ -37,8 +37,9 @@ pub fn input_loop(screen: Window) -> PResult {
         let next = screen.getch().unwrap();
         match next {
             Input::KeyBackspace |
-            Input::Character('\x08') => {
-                command_buffer.pop();
+            Input::Character('\x08') |
+            Input::Character('\x7f') => {
+                command_buffer.pop().unwrap();
             }
             Input::Character('\n') => {
                 output_buffer.push_str("$ ");
@@ -50,6 +51,7 @@ pub fn input_loop(screen: Window) -> PResult {
                 command_buffer.clear();
             }
             Input::Character(chr) => {
+                println!("char: {:?}", chr);
                 command_buffer.push(chr);
             }
             _ => {}
