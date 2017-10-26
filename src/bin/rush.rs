@@ -1,5 +1,5 @@
 extern crate rush;
 
 fn main() {
-    rush::interactive();
+    rush::start_interactive();
 }
