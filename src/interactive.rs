@@ -3,8 +3,8 @@ use errext::{ErrExt, PResult};
 use command::run_expression;
 
 fn print_buffer(screen: &Window, buffer: &str) -> PResult {
-    let height = (screen.get_max_y() - 1) as usize;
-    let width = screen.get_max_x() as usize;
+    let height = (screen.get_max_y() - 3) as usize;
+    let width = (screen.get_max_x() - 1) as usize;
     screen.mv(0, 0).unwrap();
     for line in buffer.lines().take(height) {
         let max = ::std::cmp::min(width, line.len());
@@ -57,7 +57,7 @@ pub fn input_loop(screen: Window) -> PResult {
                         Err(message) => {
                             output_buffer += &command_buffer;
                             output_buffer += "\n";
-                            output_buffer += message;
+                            output_buffer += &message;
                         }
                     }
                     output_buffer += "\n";
