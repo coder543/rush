@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate try_opt;
+
 extern crate pancurses;
 
 mod errext;
@@ -15,12 +18,4 @@ pub fn start_interactive() {
     pancurses::set_title("rush");
     screen.keypad(true);
     input_loop(screen).unwrap();
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }

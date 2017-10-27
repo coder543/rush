@@ -5,6 +5,7 @@ use interpreter::builtins::*;
 
 // Obviously just a rough sketch
 // These fields will need to be rethought
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct ExpressionOutput {
     pub command: String,
     pub stdout: String,

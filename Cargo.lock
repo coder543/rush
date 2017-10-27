@@ -3,6 +3,7 @@ name = "rush"
 version = "0.1.0"
 dependencies = [
  "pancurses 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "try_opt 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -55,6 +56,11 @@ name = "pkg-config"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
+[[package]]
+name = "try_opt"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
 [metadata]
 "checksum gcc 0.3.54 (registry+https://github.com/rust-lang/crates.io-index)" = "5e33ec290da0d127825013597dbdfc28bee4964690c7ce1166cbc2a7bd08b1bb"
 "checksum libc 0.2.32 (registry+https://github.com/rust-lang/crates.io-index)" = "56cce3130fd040c28df6f495c8492e5ec5808fb4c9093c310df02b0c8f030148"
@@ -63,3 +69,4 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum pancurses 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "775e85872854c4921272744ec1135d09b5168be5a109e9cc020ee169db37aa2f"
 "checksum pdcurses-sys 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "923a29f049a83da029e6e96d2c1de8a9e3ca7c41ab1d2a9e3ab2c85a27725cf2"
 "checksum pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "3a8b4c6b8165cd1a1cd4b9b120978131389f64bdaf456435caa41e630edba903"
+"checksum try_opt 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d30b71e7ba40551f9873f3ba9f4ee36f16015adf0962aba57caf403088370db1"
