@@ -61,6 +61,7 @@ impl Ident {
 pub enum Token {
     Operator(String, DebugInfo),
     Str(String, DebugInfo),
+    Bool(bool, DebugInfo),
     Int(i64, DebugInfo),
     Float(f64, DebugInfo),
     Ident(Ident, DebugInfo),
@@ -74,6 +75,7 @@ impl Token {
             &Token::Str(_, ref debug) => debug.clone(),
             &Token::Int(_, ref debug) => debug.clone(),
             &Token::Float(_, ref debug) => debug.clone(),
+            &Token::Bool(_, ref debug) => debug.clone(),
             &Token::Ident(_, ref debug) => debug.clone(),
             &Token::Unknown(_, ref debug) => debug.clone(),
         }
@@ -230,6 +232,16 @@ impl<'a> RushTokenizer<'a> {
         Ident::try_new(raw_token)
     }
 
+    fn get_bool(&mut self, raw_token: &str) -> Option<bool> {
+        if raw_token == "true" {
+            Some(true)
+        } else if raw_token == "false" {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
     fn get_int(&mut self, raw_token: &str) -> Option<i64> {
         raw_token.parse().ok()
     }
@@ -300,6 +312,10 @@ impl<'a> Iterator for RushTokenizer<'a> {
             return Some(Token::Float(float, DebugInfo::new(raw_token, self.pos)));
         }
 
+        if let Some(bool_val) = self.get_bool(&raw_token) {
+            return Some(Token::Bool(bool_val, DebugInfo::new(raw_token, self.pos)));
+        }
+
         Some(Token::Unknown(
             raw_token.clone(),
             DebugInfo::new(raw_token, self.pos),
@@ -329,6 +345,26 @@ mod tests {
         assert_eq!(
             tokenizer.next(),
             Some(Token::Int(32, DebugInfo::new("32", 0)))
+        );
+    }
+
+    #[test]
+    fn tokenize_bool() {
+        let mut tokenizer = RushTokenizer::new("true false other");
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Bool(true, DebugInfo::new("true", 0)))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Bool(false, DebugInfo::new("false", 5)))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Unknown(
+                "other".to_string(),
+                DebugInfo::new("other", 11),
+            ))
         );
     }
 
