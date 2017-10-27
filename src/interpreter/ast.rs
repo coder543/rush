@@ -224,6 +224,21 @@ fn parse_binary_operator(
     Ok(expr)
 }
 
+fn parse_parenthetic_expr(
+    first_token: Token,
+    tokenizer: &mut RushTokenizer,
+) -> Result<Expr, String> {
+
+    first_token.expect_operator_specific("(").map_err(
+        |mut err| {
+            err.push_str(", which has caused an internal error! Please report this!");
+            err
+        },
+    )?;
+
+    unimplemented!();
+}
+
 fn check_for_semicolon(tokenizer: &mut RushTokenizer) -> Result<(), String> {
     // ensure that there is a semicolon at the end of this expression
     // or, ensure that this is the final expression,
