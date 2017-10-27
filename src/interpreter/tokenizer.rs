@@ -1,6 +1,19 @@
 #![allow(unused)]
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct DebugInfo {
+    pub raw: String,
+    pub pos: u64,
+}
+
+impl DebugInfo {
+    pub fn new<T: Into<String>>(raw: T, pos: u64) -> DebugInfo {
+        let raw = raw.into();
+        DebugInfo { raw, pos }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Ident(pub String);
 
 impl Ident {
@@ -31,19 +44,6 @@ impl Ident {
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct DebugInfo {
-    raw: String,
-    pos: u64,
-}
-
-impl DebugInfo {
-    fn new<T: Into<String>>(raw: T, pos: u64) -> DebugInfo {
-        let raw = raw.into();
-        DebugInfo { raw, pos }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Token {
     Operator(String, DebugInfo),
     Str(String, DebugInfo),
@@ -63,7 +63,7 @@ pub struct RushTokenizer<'a> {
 }
 
 impl<'a> RushTokenizer<'a> {
-    fn new(buffer: &'a str) -> RushTokenizer<'a> {
+    pub fn new(buffer: &'a str) -> RushTokenizer<'a> {
         RushTokenizer {
             token_stream: buffer.split(&[' ', '\n']),
             ready_tokens: VecDeque::new(),
