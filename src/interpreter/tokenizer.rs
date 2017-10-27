@@ -53,6 +53,24 @@ pub enum Token {
     Unknown(String, DebugInfo),
 }
 
+static SYM_OPS: [&str; 14] = [
+    "+",
+    "-",
+    "*",
+    "/",
+    "=",
+    "!",
+    ";",
+    "(",
+    ")",
+    "{",
+    "}",
+    "==",
+    "&&",
+    "||",
+];
+static WORD_OPS: [&str; 3] = ["or", "and", "not"];
+
 use std::str::Split;
 use std::collections::VecDeque;
 pub struct RushTokenizer<'a> {
@@ -131,21 +149,31 @@ impl<'a> RushTokenizer<'a> {
     }
 
     fn is_operator(&mut self, raw_token: &str) -> bool {
-        [
-            "+",
-            "-",
-            "*",
-            "/",
-            "=",
-            "==",
-            "&&",
-            "||",
-            "!",
-            "or",
-            "and",
-            "not",
-            ";",
-        ].contains(&raw_token)
+        SYM_OPS.contains(&raw_token) || WORD_OPS.contains(&raw_token)
+    }
+
+    fn subdivide_token(&mut self, raw_token: &mut String) {
+        println!("token to subdivide is {}", raw_token);
+        if raw_token.len() == 1 {
+            return;
+        }
+
+        for i in 0..raw_token.len() {
+            for op in SYM_OPS.iter() {
+                if raw_token[i..].starts_with(op) {
+                    let new = if i == 0 {
+                        raw_token.split_off(op.len())
+                    } else {
+                        raw_token.split_off(i)
+                    };
+
+                    self.last_len -= new.len() as u64;
+                    self.ready_tokens.push_front(new);
+                    self.last_len -= 1;
+                    return;
+                }
+            }
+        }
     }
 }
 
@@ -155,19 +183,11 @@ impl<'a> Iterator for RushTokenizer<'a> {
     fn next(&mut self) -> Option<Token> {
         let mut raw_token = try_opt!(self.next_raw_token());
 
+        self.subdivide_token(&mut raw_token);
+
         //this print statement only exists during unit testing
         #[cfg(test)]
         println!("token at pos {} is {:?}", self.pos, raw_token);
-
-        // if the current token ends in a semicolon, remove it and
-        // let the semicolon be the next token
-        if raw_token.len() != 1 && raw_token.ends_with(";") {
-            raw_token.pop();
-
-            // remove the semicolon followed by space from the len of current token
-            self.last_len -= 2;
-            self.ready_tokens.push_back(";".to_string());
-        }
 
         if self.is_operator(&raw_token) {
             let debug = DebugInfo::new(raw_token.clone(), self.pos);
@@ -265,6 +285,39 @@ mod tests {
                 "htop".to_string(),
                 DebugInfo::new("htop", 0),
             ))
+        );
+    }
+
+    #[test]
+    fn tokenize_subdivision() {
+        let mut tokenizer = RushTokenizer::new("(32&&15)||23;");
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Operator("(".to_string(), DebugInfo::new("(", 0)))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Int(32, DebugInfo::new("32", 1)))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Operator("&&".to_string(), DebugInfo::new("&&", 3)))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Int(15, DebugInfo::new("15", 5)))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Operator(")".to_string(), DebugInfo::new(")", 7)))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Operator("||".to_string(), DebugInfo::new("||", 8)))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Int(23, DebugInfo::new("23", 10)))
         );
     }
 
