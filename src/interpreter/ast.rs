@@ -169,7 +169,7 @@ fn parse_unary_operator(
         _ => {
             return Err(
                 debug.to_string() +
-                    ", which caused Rust to experience an internal error! Please report this!",
+                    ", which caused Rush to experience an internal error! Please report this!",
             )?
         }
     };
@@ -213,7 +213,7 @@ fn parse_binary_operator(
         _ => {
             return Err(
                 debug.to_string() +
-                    ", which caused Rust to experience an internal error! Please report this!",
+                    ", which caused Rush to experience an internal error! Please report this!",
             )?
         }
     };
