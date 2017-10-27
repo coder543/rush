@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use std::fmt;
+
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct DebugInfo {
     pub raw: String,
@@ -10,6 +12,18 @@ impl DebugInfo {
     pub fn new<T: Into<String>>(raw: T, pos: u64) -> DebugInfo {
         let raw = raw.into();
         DebugInfo { raw, pos }
+    }
+}
+
+impl fmt::Display for DebugInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Found {} at character {}", self.raw, self.pos)
+    }
+}
+
+impl From<DebugInfo> for String {
+    fn from(debug: DebugInfo) -> String {
+        debug.to_string()
     }
 }
 
@@ -51,6 +65,82 @@ pub enum Token {
     Float(f64, DebugInfo),
     Ident(Ident, DebugInfo),
     Unknown(String, DebugInfo),
+}
+
+impl Token {
+    pub fn get_debug_info(&self) -> DebugInfo {
+        match self {
+            &Token::Operator(_, ref debug) => debug.clone(),
+            &Token::Str(_, ref debug) => debug.clone(),
+            &Token::Int(_, ref debug) => debug.clone(),
+            &Token::Float(_, ref debug) => debug.clone(),
+            &Token::Ident(_, ref debug) => debug.clone(),
+            &Token::Unknown(_, ref debug) => debug.clone(),
+        }
+    }
+
+    pub fn expect_operator(&self, err: &str) -> Result<(), String> {
+        match self {
+            &Token::Operator(_, _) => Ok(()),
+            _ => Err(format!("{}, {}", self.get_debug_info(), err)),
+        }
+    }
+
+    pub fn expect_operator_specific(&self, op: &str) -> Result<(), String> {
+        match self {
+            &Token::Operator(ref operator, _) if operator == op => Ok(()),
+            _ => Err(format!("{}, expected '{}'", self.get_debug_info(), op)),
+        }
+    }
+
+    pub fn expect_str(&self, err: &str) -> Result<(), String> {
+        match self {
+            &Token::Str(_, _) => Ok(()),
+            _ => Err(format!("{}, {}", self.get_debug_info(), err)),
+        }
+    }
+
+    pub fn expect_int(&self, err: &str) -> Result<(), String> {
+        match self {
+            &Token::Int(_, _) => Ok(()),
+            _ => Err(format!("{}, {}", self.get_debug_info(), err)),
+        }
+    }
+
+    pub fn expect_float(&self, err: &str) -> Result<(), String> {
+        match self {
+            &Token::Float(_, _) => Ok(()),
+            _ => Err(format!("{}, {}", self.get_debug_info(), err)),
+        }
+    }
+
+    pub fn expect_ident(&self, err: &str) -> Result<(), String> {
+        match self {
+            &Token::Ident(_, _) => Ok(()),
+            _ => Err(format!("{}, {}", self.get_debug_info(), err)),
+        }
+    }
+
+    pub fn expect_ident_specific(&self, id: Ident) -> Result<(), String> {
+        match self {
+            &Token::Ident(ref ident, _) if *ident == id => Ok(()),
+            _ => Err(format!("{}, expected '{}'", self.get_debug_info(), id.0)),
+        }
+    }
+
+    pub fn expect_unknown(&self, err: &str) -> Result<(), String> {
+        match self {
+            &Token::Unknown(_, _) => Ok(()),
+            _ => Err(format!("{}, {}", self.get_debug_info(), err)),
+        }
+    }
+
+    pub fn expect_unknown_specific(&self, unknown: String, err: &str) -> Result<(), String> {
+        match self {
+            &Token::Unknown(ref unk, _) if *unk == unknown => Ok(()),
+            _ => Err(format!("{}, expected '{}'", self.get_debug_info(), unknown)),
+        }
+    }
 }
 
 static SYM_OPS: [&str; 14] = [
