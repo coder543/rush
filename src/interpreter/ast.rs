@@ -113,16 +113,34 @@ fn parse_expr(first_token: Token, tokenizer: &mut RushTokenizer) -> Result<Expr,
 
     let first_expr = match first_token {
         Token::Operator(op, debug) => {
+            if op == ";" {
+                return Ok(Expr::new(Node::Noop, debug));
+            }
+
             let expr = parse_unary_operator(op, debug, tokenizer)?;
             check_for_semicolon(tokenizer)?;
             return Ok(expr);
         }
-        Token::Ident(id, debug) => return Ok(Expr::new(Node::Ident(id), debug)),
-        _ => Err("unknown!")?,
+        Token::Ident(id, debug) => Expr::new(Node::Ident(id), debug),
+        _ => unimplemented!(),
     };
 
-    unimplemented!()
-    // if let second_token = tokenizer.next();
+    if let Some(second_token) = tokenizer.next() {
+        match second_token {
+            Token::Operator(op, debug) => {
+                if op == ";" {
+                    Ok(first_expr)
+                } else {
+                    let expr = parse_binary_operator(first_expr, op, debug, tokenizer)?;
+                    check_for_semicolon(tokenizer)?;
+                    Ok(expr)
+                }
+            }
+            _ => unimplemented!(),
+        }
+    } else {
+        Ok(first_expr)
+    }
 }
 
 fn parse_unary_operator(
@@ -131,39 +149,79 @@ fn parse_unary_operator(
     tokenizer: &mut RushTokenizer,
 ) -> Result<Expr, String> {
 
-    if op == ";" {
-        return Ok(Expr::new(Node::Noop, debug));
-    }
-
-    if op == "!" || op == "-" {
-        let next = tokenizer.next().ok_or(
-            debug.to_string() + ", then encountered end of input! '" + &op +
-                "' must be followed by an expression.",
-        )?;
-
-        let next_expr = parse_expr(next, tokenizer)?;
-
-        let operator = match op.as_ref() {
-            "!" => Operator::Not(next_expr),
-            "-" => Operator::Negate(next_expr),
-            _ => {
-                return Err(
-                    debug.to_string() +
-                        ", which caused Rust to experience an internal error! Please report this!",
-                )?
-            }
-        };
-
-        let expr = Expr::new(Node::Op(Box::new(operator)), debug);
-
-
-        return Ok(expr);
-    } else {
+    if !(op == "!" || op == "-") {
         return Err(
             debug.to_string() + ", but there is no expression preceding it and '" + &op +
                 "' is not a unary operator!",
         )?;
     }
+
+    let next = tokenizer.next().ok_or(
+        debug.to_string() + ", then encountered end of input! '" + &op +
+            "' must be followed by an expression.",
+    )?;
+
+    let next_expr = parse_expr(next, tokenizer)?;
+
+    let operator = match op.as_ref() {
+        "!" => Operator::Not(next_expr),
+        "-" => Operator::Negate(next_expr),
+        _ => {
+            return Err(
+                debug.to_string() +
+                    ", which caused Rust to experience an internal error! Please report this!",
+            )?
+        }
+    };
+
+    let expr = Expr::new(Node::Op(Box::new(operator)), debug);
+
+
+    Ok(expr)
+}
+
+fn parse_binary_operator(
+    first_expr: Expr,
+    op: String,
+    debug: DebugInfo,
+    tokenizer: &mut RushTokenizer,
+) -> Result<Expr, String> {
+
+    if op == "!" {
+        return Err(
+            debug.to_string() + ", but there is an expression preceding it and '" + &op +
+                "' is not a binary operator!",
+        )?;
+    }
+
+    let next = tokenizer.next().ok_or(
+        debug.to_string() + ", then encountered end of input! '" + &op +
+            "' must be followed by an expression.",
+    )?;
+
+    let next_expr = parse_expr(next, tokenizer)?;
+
+    let operator = match op.as_ref() {
+        "+" => Operator::Add(first_expr, next_expr),
+        "-" => Operator::Sub(first_expr, next_expr),
+        "*" => Operator::Mul(first_expr, next_expr),
+        "/" => Operator::Div(first_expr, next_expr),
+        "&&" => Operator::And(first_expr, next_expr),
+        "||" => Operator::Or(first_expr, next_expr),
+        "==" => Operator::Equals(first_expr, next_expr),
+        "!=" => Operator::NotEquals(first_expr, next_expr),
+        _ => {
+            return Err(
+                debug.to_string() +
+                    ", which caused Rust to experience an internal error! Please report this!",
+            )?
+        }
+    };
+
+    let expr = Expr::new(Node::Op(Box::new(operator)), debug);
+
+
+    Ok(expr)
 }
 
 fn check_for_semicolon(tokenizer: &mut RushTokenizer) -> Result<(), String> {
@@ -204,6 +262,36 @@ mod tests {
                     ],
                 ))),
                 debug: DebugInfo::new("!$someBool", 0),
+            })
+        );
+    }
+
+    #[test]
+    fn parse_add() {
+        let expr = Expr::parse("$someInt + $otherInt");
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            node: Node::Op(Box::new(Operator::Add(
+                                Expr {
+                                    node: Node::Ident(Ident("$someInt".to_string())),
+                                    debug: DebugInfo::new("$someInt", 0),
+                                },
+                                Expr {
+                                    node: Node::Ident(Ident("$otherInt".to_string())),
+                                    debug: DebugInfo::new("$otherInt", 11),
+                                },
+                            ))),
+                            debug: DebugInfo::new("+", 9),
+                        },
+                    ],
+                ))),
+                debug: DebugInfo::new("$someInt + $otherInt", 0),
             })
         );
     }
