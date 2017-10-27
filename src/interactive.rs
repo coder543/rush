@@ -64,7 +64,6 @@ pub fn input_loop(screen: Window) -> PResult {
                     command_buffer.clear();
                 }
                 Input::Character(chr) => {
-                    println!("char: {:?}", chr);
                     command_buffer.push(chr);
                 }
                 _ => {}
