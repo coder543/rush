@@ -214,10 +214,15 @@ fn parse_unary_operator(
 
 fn op_precendence(op: &str) -> i32 {
     match op {
-        "+" => 10,
-        "-" => 20,
-        "*" => 30,
-        "/" => 40,
+        "=" => 0,
+        "+" => 20,
+        "-" => 30,
+        "*" => 40,
+        "/" => 50,
+        "||" => 5,
+        "==" => 10,
+        "!=" => 10,
+        "&&" => 10,
         _ => -1,
     }
 }
@@ -238,6 +243,12 @@ fn operator_expr_from(
             "||" => Operator::Or(first_expr, next_expr),
             "==" => Operator::Equals(first_expr, next_expr),
             "!=" => Operator::NotEquals(first_expr, next_expr),
+            "=" => {
+                match first_expr.node {
+                    Node::Ident(id) => Operator::Assign(id, next_expr),
+                    _ => Err(first_expr.debug.to_string() + "; left-hand side of assignment must be an identifier, not an expression.")?,
+                }
+            }
             _ => {
                 return Err(
                     debug.to_string() +
@@ -411,6 +422,33 @@ mod tests {
                     ],
                 ))),
                 debug: DebugInfo::new("!$someBool", 0),
+            })
+        );
+    }
+
+    #[test]
+    fn parse_assign() {
+        let expr = Expr::parse("$someInt = $otherInt");
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            node: Node::Op(Box::new(Operator::Assign(
+                                Ident("$someInt".to_string()),
+                                Expr {
+                                    node: Node::Ident(Ident("$otherInt".to_string())),
+                                    debug: DebugInfo::new("$otherInt", 11),
+                                },
+                            ))),
+                            debug: DebugInfo::new("=", 9),
+                        },
+                    ],
+                ))),
+                debug: DebugInfo::new("$someInt = $otherInt", 0),
             })
         );
     }
