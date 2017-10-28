@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -68,6 +66,7 @@ pub enum Token {
     Unknown(String, DebugInfo),
 }
 
+#[allow(unused)]
 impl Token {
     pub fn get_debug_info(&self) -> DebugInfo {
         match self {

@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use interpreter::tokenizer::*;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -67,6 +65,7 @@ pub struct Expr {
 use std::iter::Peekable;
 type Tokenizer<'a> = Peekable<RushTokenizer<'a>>;
 
+#[allow(unused)]
 impl Expr {
     pub fn new(node: Node, debug: DebugInfo) -> Expr {
         Expr { node, debug }
@@ -86,7 +85,7 @@ impl Expr {
     }
 }
 
-fn parse_exprs(mut tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, String> {
+fn parse_exprs(tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, String> {
     if !outermost {
         tokenizer
             .next()
@@ -120,7 +119,10 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
     let token = tokenizer.next().ok_or(
         "Reached end of input while trying to parse_primary",
     )?;
+
+    #[cfg(test)]
     println!("parse_primary: {:?}", token);
+
     Ok(match token {
         Token::Ident(id, debug) => Expr::new(Node::Ident(id), debug),
         Token::Int(int, debug) => Expr::new(Node::Int(int), debug),
@@ -143,6 +145,7 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
 fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
     let primary_expr = parse_primary(tokenizer)?;
 
+    #[cfg(test)]
     println!("parse_expr");
 
     {
@@ -164,6 +167,8 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
 
     let expr = parse_binary_operator(0, primary_expr, tokenizer)?;
 
+    check_for_end_of_expr(tokenizer)?;
+
     Ok(expr)
 }
 
@@ -173,6 +178,7 @@ fn parse_unary_operator(
     tokenizer: &mut Tokenizer,
 ) -> Result<Expr, String> {
 
+    #[cfg(test)]
     println!("parse_unary: {:?}, {:?}", op, debug);
 
     if !(op == "!" || op == "-") {
@@ -249,6 +255,7 @@ fn parse_binary_operator(
     tokenizer: &mut Tokenizer,
 ) -> Result<Expr, String> {
 
+    #[cfg(test)]
     println!("parse_binary");
 
     let next_token = tokenizer.next().ok_or(
@@ -269,6 +276,7 @@ fn parse_binary_operator(
 
     let precendence = op_precendence(&op);
 
+    #[cfg(test)]
     println!(
         "parse_binary: {:?}, {:?}, {} < {}",
         op,
@@ -300,6 +308,7 @@ fn parse_binary_operator(
         }
     };
 
+    #[cfg(test)]
     println!("precedence: {} < {}", precendence, next_precendence);
 
     let next_expr = if precendence < next_precendence {
@@ -324,6 +333,7 @@ fn parse_parenthetic_expr(
     tokenizer: &mut Tokenizer,
 ) -> Result<Expr, String> {
 
+    #[cfg(test)]
     println!("parse_parenthetic: {:?}, {:?}", op, debug);
 
     if op != "(" {
@@ -353,23 +363,28 @@ fn parse_parenthetic_expr(
             err
         })?;
 
+    #[cfg(test)]
     println!("returning from parenthetic");
 
     Ok(expr)
 }
 
-fn check_for_semicolon(tokenizer: &mut Tokenizer) -> Result<(), String> {
+fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
     // ensure that there is a semicolon at the end of this expression
     // or, ensure that this is the final expression,
     // by providing a fake semicolon if no token is returned at all
-    tokenizer
-        .next()
-        .or(Some(Token::Operator(
-            ";".to_string(),
-            DebugInfo::new(";".to_string(), 0),
-        )))
-        .unwrap()
-        .expect_operator_specific(";")
+
+    let fake_semicolon = Token::Operator(";".to_string(), DebugInfo::new(";".to_string(), 0));
+
+    let op = match tokenizer.peek().or(Some(&fake_semicolon)).unwrap() {
+        &Token::Operator(ref op, _) if op == ";" || op == ")" => op.clone(),
+        token => return token.expect_operator_specific(";"),
+    };
+    // use up the semicolon if it is there
+    if op == ";" {
+        tokenizer.next();
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -426,6 +441,49 @@ mod tests {
                     ],
                 ))),
                 debug: DebugInfo::new("$someInt + $otherInt", 0),
+            })
+        );
+    }
+
+    #[test]
+    fn parse_add2() {
+        let expr = Expr::parse("$someInt + $otherInt; $someInt + $otherInt;");
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            node: Node::Op(Box::new(Operator::Add(
+                                Expr {
+                                    node: Node::Ident(Ident("$someInt".to_string())),
+                                    debug: DebugInfo::new("$someInt", 0),
+                                },
+                                Expr {
+                                    node: Node::Ident(Ident("$otherInt".to_string())),
+                                    debug: DebugInfo::new("$otherInt", 11),
+                                },
+                            ))),
+                            debug: DebugInfo::new("+", 9),
+                        },
+                        Expr {
+                            node: Node::Op(Box::new(Operator::Add(
+                                Expr {
+                                    node: Node::Ident(Ident("$someInt".to_string())),
+                                    debug: DebugInfo::new("$someInt", 22),
+                                },
+                                Expr {
+                                    node: Node::Ident(Ident("$otherInt".to_string())),
+                                    debug: DebugInfo::new("$otherInt", 33),
+                                },
+                            ))),
+                            debug: DebugInfo::new("+", 31),
+                        },
+                    ],
+                ))),
+                debug: DebugInfo::new("$someInt + $otherInt; $someInt + $otherInt;", 0),
             })
         );
     }
