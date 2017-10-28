@@ -25,6 +25,44 @@ impl Expr {
     }
 }
 
+/// avoids needlessly cloning an Expr if it is already resolved to
+/// a primitive value. unfortunately, this requires passing in an
+/// external storage variable for this case where the value has not
+/// yet been resolved to a primitive, for lifetime reasons.
+macro_rules! resolve {
+    ($exp:ident, $memory:ident, $store:ident) => (
+        match $exp.node {
+            Node::Int(_) => $exp,
+            Node::Float(_) => $exp,
+            Node::Str(_) => $exp,
+            Node::Bool(_) => $exp,
+            _ => {$store = $exp.run($memory)?; &$store}
+        }
+    )
+}
+
+macro_rules! do_binary_op {
+    ($op:tt, $memory:ident, $left:ident, $right:ident, $(($typeA:tt, $typeB:tt -> ($asType:tt:$asTypePrim:tt))),*; $(($typeA2:tt, $typeB2:tt -> ($asType2:tt))),*; _ => $defaultCase:expr) => ({
+        let store1;
+        let store2;
+        let left_res = resolve!($left, $memory, store1);
+        let right_res = resolve!($right, $memory, store2);
+        match (&left_res.node, &right_res.node) {
+            $(
+                (&Node::$typeA(val1), &Node::$typeB(val2)) => {
+                    Ok(Expr::new(Node::$asType((val1 as $asTypePrim) $op (val2 as $asTypePrim)), DebugInfo::none()))
+                },
+            )*
+            $(
+                (&Node::$typeA2(ref val1), &Node::$typeB2(ref val2)) => {
+                    Ok(Expr::new(Node::$asType2(val1 $op val2), DebugInfo::none()))
+                },
+            )*
+            _ => $defaultCase,
+        }
+    })
+}
+
 impl Operator {
     fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
         match *self {
@@ -34,76 +72,68 @@ impl Operator {
                 Ok(Expr::new(Node::Noop, expr.debug.clone()))
             }
 
-            // Most of the following are the opposite of DRY. I should
-            // figure out a way to reduce the needless duplication.
             Operator::Add(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Int(val1 + val2), DebugInfo::none()))
-                    }
-                    (Node::Float(val1), Node::Float(val2)) => {
-                        Ok(Expr::new(Node::Float(val1 + val2), DebugInfo::none()))
-                    }
-                    _ => unimplemented!(),
-                }
+                do_binary_op!(+, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => unimplemented!())
             }
             Operator::Sub(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Int(val1 - val2), DebugInfo::none()))
-                    }
-                    (Node::Float(val1), Node::Float(val2)) => {
-                        Ok(Expr::new(Node::Float(val1 - val2), DebugInfo::none()))
-                    }
-                    _ => unimplemented!(),
-                }
+                do_binary_op!(-, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => unimplemented!())
             }
             Operator::Mul(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Int(val1 * val2), DebugInfo::none()))
-                    }
-                    (Node::Float(val1), Node::Float(val2)) => {
-                        Ok(Expr::new(Node::Float(val1 * val2), DebugInfo::none()))
-                    }
-                    _ => unimplemented!(),
-                }
+                do_binary_op!(*, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => unimplemented!())
             }
             Operator::Div(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Int(val1 / val2), DebugInfo::none()))
-                    }
-                    (Node::Float(val1), Node::Float(val2)) => {
-                        Ok(Expr::new(Node::Float(val1 / val2), DebugInfo::none()))
-                    }
-                    _ => unimplemented!(),
-                }
+                do_binary_op!(/, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => unimplemented!())
             }
             Operator::Mod(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Int(val1 % val2), DebugInfo::none()))
-                    }
-                    _ => unimplemented!(),
-                }
+                do_binary_op!(%, memory, left, right, (Int, Int -> (Int:i64));; _ => unimplemented!())
+            }
+            Operator::And(ref left, ref right) => {
+                do_binary_op!(&&, memory, left, right, (Bool, Bool -> (Bool:bool));; _ => Err(
+                            left.debug.to_string() + &right.debug.to_string() +
+                            ", attempt to use logical AND on something which is not a boolean")?)
+            }
+            Operator::Or(ref left, ref right) => {
+                do_binary_op!(||, memory, left, right, (Bool, Bool -> (Bool:bool));; _ => Err(
+                            left.debug.to_string() + &right.debug.to_string() +
+                            ", attempt to use logical OR on something which is not a boolean")?)
+            }
+            Operator::Less(ref left, ref right) => {
+                do_binary_op!(<, memory, left, right, (Int, Int -> (Bool:i64)), (Float, Float -> (Bool:f64)), (Float, Int -> (Bool:f64)), (Int, Float -> (Bool:f64)); (Str, Str -> (Bool)); _ => Err(
+                            left.debug.to_string() + &right.debug.to_string() +
+                            ", attempt to compare two values for equality which cannot be compared")?)
+            }
+            Operator::LessOrEquals(ref left, ref right) => {
+                do_binary_op!(<=, memory, left, right, (Int, Int -> (Bool:i64)), (Float, Float -> (Bool:f64)), (Float, Int -> (Bool:f64)), (Int, Float -> (Bool:f64)); (Str, Str -> (Bool)); _ => Err(
+                            left.debug.to_string() + &right.debug.to_string() +
+                            ", attempt to compare two values for equality which cannot be compared")?)
+            }
+            Operator::Greater(ref left, ref right) => {
+                do_binary_op!(>, memory, left, right, (Int, Int -> (Bool:i64)), (Float, Float -> (Bool:f64)), (Float, Int -> (Bool:f64)), (Int, Float -> (Bool:f64)); (Str, Str -> (Bool)); _ => Err(
+                            left.debug.to_string() + &right.debug.to_string() +
+                            ", attempt to compare two values for equality which cannot be compared")?)
+            }
+            Operator::GreaterOrEquals(ref left, ref right) => {
+                do_binary_op!(>=, memory, left, right, (Int, Int -> (Bool:i64)), (Float, Float -> (Bool:f64)), (Float, Int -> (Bool:f64)), (Int, Float -> (Bool:f64)); (Str, Str -> (Bool)); _ => Err(
+                            left.debug.to_string() + &right.debug.to_string() +
+                            ", attempt to compare two values for equality which cannot be compared")?)
+            }
+            Operator::Equals(ref left, ref right) => {
+                do_binary_op!(==, memory, left, right,; (Int, Int -> (Bool)), (Float, Float -> (Bool)), (Str, Str -> (Bool)), (Bool, Bool -> (Bool)); _ => Err(
+                            left.debug.to_string() + &right.debug.to_string() +
+                            ", attempt to compare two values for equality which cannot be compared")?)
+            }
+            Operator::NotEquals(ref left, ref right) => {
+                do_binary_op!(!=, memory, left, right,; (Int, Int -> (Bool)), (Float, Float -> (Bool)), (Str, Str -> (Bool)), (Bool, Bool -> (Bool)); _ => Err(
+                            left.debug.to_string() + &right.debug.to_string() +
+                            ", attempt to compare two values for equality which cannot be compared")?)
             }
 
             Operator::Negate(ref expr) => {
-                let expr_res = expr.run(memory)?;
-                match expr_res.node {
-                    Node::Int(val) => Ok(Expr::new(Node::Int(-val), DebugInfo::none())),
-                    Node::Float(val) => Ok(Expr::new(Node::Float(-val), DebugInfo::none())),
+                let store;
+                let expr_res = resolve!(expr, memory, store);
+                match &expr_res.node {
+                    &Node::Int(val) => Ok(Expr::new(Node::Int(-val), DebugInfo::none())),
+                    &Node::Float(val) => Ok(Expr::new(Node::Float(-val), DebugInfo::none())),
                     _ => {
                         Err(
                             expr.debug.to_string() +
@@ -114,235 +144,14 @@ impl Operator {
             }
 
             Operator::Not(ref expr) => {
-                let expr_res = expr.run(memory)?;
-                match expr_res.node {
-                    Node::Bool(val) => Ok(Expr::new(Node::Bool(!val), DebugInfo::none())),
+                let store;
+                let expr_res = resolve!(expr, memory, store);
+                match &expr_res.node {
+                    &Node::Bool(val) => Ok(Expr::new(Node::Bool(!val), DebugInfo::none())),
                     _ => {
                         Err(
                             expr.debug.to_string() +
                                 ", attempt to use logical NOT on something which is not a boolean",
-                        )?
-                    }
-                }
-            }
-            Operator::And(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Bool(val1), Node::Bool(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 && val2), DebugInfo::none()))
-                    }
-                    _ => {
-                        Err(
-                            left.debug.to_string() + &right.debug.to_string() +
-                                ", attempt to use logical AND on something which is not a boolean",
-                        )?
-                    }
-                }
-            }
-            Operator::Or(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Bool(val1), Node::Bool(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 || val2), DebugInfo::none()))
-                    }
-                    _ => {
-                        Err(
-                            left.debug.to_string() + &right.debug.to_string() +
-                                ", attempt to use logical AND on something which is not a boolean",
-                        )?
-                    }
-                }
-            }
-            Operator::Equals(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Bool(val1), Node::Bool(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 == val2), DebugInfo::none()))
-                    }
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 == val2), DebugInfo::none()))
-                    }
-                    (Node::Str(val1), Node::Str(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 == val2), DebugInfo::none()))
-                    }
-                    (Node::Function(val1), Node::Function(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 == val2), DebugInfo::none()))
-                    }
-                    (Node::Float(_), _) => {
-                        Err(
-                            left.debug.to_string() +
-                                ", floating point equality testing is not supported",
-                        )?
-                    }
-                    (_, Node::Float(_)) => {
-                        Err(
-                            right.debug.to_string() +
-                                ", floating point equality testing is not supported",
-                        )?
-                    }
-                    _ => {
-                        Err(
-                            left.debug.to_string() + &right.debug.to_string() +
-                                ", attempt to compare two values for equality which cannot be compared",
-                        )?
-                    }
-                }
-            }
-            Operator::NotEquals(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Bool(val1), Node::Bool(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 != val2), DebugInfo::none()))
-                    }
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 != val2), DebugInfo::none()))
-                    }
-                    (Node::Str(val1), Node::Str(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 != val2), DebugInfo::none()))
-                    }
-                    (Node::Function(val1), Node::Function(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 != val2), DebugInfo::none()))
-                    }
-                    (Node::Float(_), _) => {
-                        Err(
-                            left.debug.to_string() +
-                                ", floating point equality testing is not supported",
-                        )?
-                    }
-                    (_, Node::Float(_)) => {
-                        Err(
-                            right.debug.to_string() +
-                                ", floating point equality testing is not supported",
-                        )?
-                    }
-                    _ => {
-                        Err(
-                            left.debug.to_string() + &right.debug.to_string() +
-                                ", attempt to compare two values for equality which cannot be compared",
-                        )?
-                    }
-                }
-            }
-            Operator::Less(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Bool(val1), Node::Bool(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 < val2), DebugInfo::none()))
-                    }
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 < val2), DebugInfo::none()))
-                    }
-                    (Node::Str(val1), Node::Str(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 < val2), DebugInfo::none()))
-                    }
-                    (Node::Function(val1), Node::Function(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 < val2), DebugInfo::none()))
-                    }
-                    (Node::Float(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 < (val2 as f64)), DebugInfo::none()))
-                    }
-                    (Node::Int(val1), Node::Float(val2)) => {
-                        Ok(Expr::new(Node::Bool((val1 as f64) < val2), DebugInfo::none()))
-                    }
-                    _ => {
-                        Err(
-                            left.debug.to_string() + &right.debug.to_string() +
-                                ", attempt to compare two values for equality which cannot be compared",
-                        )?
-                    }
-                }
-            }
-            Operator::LessOrEquals(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Bool(val1), Node::Bool(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 <= val2), DebugInfo::none()))
-                    }
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 <= val2), DebugInfo::none()))
-                    }
-                    (Node::Str(val1), Node::Str(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 <= val2), DebugInfo::none()))
-                    }
-                    (Node::Function(val1), Node::Function(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 <= val2), DebugInfo::none()))
-                    }
-                    (Node::Float(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 <= (val2 as f64)), DebugInfo::none()))
-                    }
-                    (Node::Int(val1), Node::Float(val2)) => {
-                        Ok(Expr::new(Node::Bool((val1 as f64) <= val2), DebugInfo::none()))
-                    }
-                    _ => {
-                        Err(
-                            left.debug.to_string() + &right.debug.to_string() +
-                                ", attempt to compare two values for equality which cannot be compared",
-                        )?
-                    }
-                }
-            }
-            Operator::Greater(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Bool(val1), Node::Bool(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 > val2), DebugInfo::none()))
-                    }
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 > val2), DebugInfo::none()))
-                    }
-                    (Node::Str(val1), Node::Str(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 > val2), DebugInfo::none()))
-                    }
-                    (Node::Function(val1), Node::Function(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 > val2), DebugInfo::none()))
-                    }
-                    (Node::Float(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 > (val2 as f64)), DebugInfo::none()))
-                    }
-                    (Node::Int(val1), Node::Float(val2)) => {
-                        Ok(Expr::new(Node::Bool((val1 as f64) > val2), DebugInfo::none()))
-                    }
-                    _ => {
-                        Err(
-                            left.debug.to_string() + &right.debug.to_string() +
-                                ", attempt to compare two values for equality which cannot be compared",
-                        )?
-                    }
-                }
-            }
-            Operator::GreaterOrEquals(ref left, ref right) => {
-                let left_res = left.run(memory)?;
-                let right_res = right.run(memory)?;
-                match (left_res.node, right_res.node) {
-                    (Node::Bool(val1), Node::Bool(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 >= val2), DebugInfo::none()))
-                    }
-                    (Node::Int(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 >= val2), DebugInfo::none()))
-                    }
-                    (Node::Str(val1), Node::Str(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 >= val2), DebugInfo::none()))
-                    }
-                    (Node::Function(val1), Node::Function(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 >= val2), DebugInfo::none()))
-                    }
-                    (Node::Float(val1), Node::Int(val2)) => {
-                        Ok(Expr::new(Node::Bool(val1 >= (val2 as f64)), DebugInfo::none()))
-                    }
-                    (Node::Int(val1), Node::Float(val2)) => {
-                        Ok(Expr::new(Node::Bool((val1 as f64) >= val2), DebugInfo::none()))
-                    }
-                    _ => {
-                        Err(
-                            left.debug.to_string() + &right.debug.to_string() +
-                                ", attempt to compare two values for equality which cannot be compared",
                         )?
                     }
                 }
