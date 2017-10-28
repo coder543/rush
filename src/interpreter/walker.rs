@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn walk_assign() {
-        let mut expr = Expr::parse("$someInt = 35").unwrap();
+        let expr = Expr::parse("$someInt = 35").unwrap();
         let mut memory = &mut HashMap::new();
 
         // create $someInt outside the scope of the anonymous outer function that
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn walk_assign2() {
-        let mut expr = Expr::parse("$otherInt = 35; $someInt = $otherInt + 2;").unwrap();
+        let expr = Expr::parse("$otherInt = 35; $someInt = $otherInt + 2;").unwrap();
         let mut memory = &mut HashMap::new();
 
         // create $someInt outside the scope of the anonymous outer function that
@@ -130,7 +130,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn walk_assign_undefined() {
-        let mut expr = Expr::parse("$someInt = 35; $otherInt = $someInt + $whatIsThis;").unwrap();
+        let expr = Expr::parse("$someInt = 35; $otherInt = $someInt + $whatIsThis;").unwrap();
         let mut memory = &mut HashMap::new();
         let result = expr.run(memory).unwrap();
     }
