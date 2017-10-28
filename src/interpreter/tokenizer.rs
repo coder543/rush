@@ -306,7 +306,16 @@ impl<'a> Iterator for RushTokenizer<'a> {
         println!("token at pos {} is {:?}", self.pos, raw_token);
 
         if self.is_operator(&raw_token) {
+            let mut raw_token = raw_token;
             let debug = DebugInfo::new(raw_token.clone(), self.pos);
+
+            raw_token = match raw_token.as_str() { 
+                "not" => "!",
+                "and" => "&&",
+                "or" => "||",
+                _ => &raw_token,
+            }.to_string();
+
             return Some(Token::Operator(raw_token, debug));
         }
 
@@ -413,6 +422,23 @@ mod tests {
         assert_eq!(
             tokenizer.next(),
             Some(Token::Operator("-".to_string(), DebugInfo::new("-", 2)))
+        );
+    }
+
+    #[test]
+    fn tokenize_word_operators() {
+        let mut tokenizer = RushTokenizer::new("and or not");
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Operator("&&".to_string(), DebugInfo::new("and", 0)))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Operator("||".to_string(), DebugInfo::new("or", 4)))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Operator("!".to_string(), DebugInfo::new("not", 7)))
         );
     }
 
