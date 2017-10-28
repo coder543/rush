@@ -13,7 +13,7 @@ use interactive::input_loop;
 mod interpreter;
 
 pub fn start_interactive() {
-    let screen = pancurses::initscr();
+    let screen = &pancurses::initscr();
     pancurses::noecho();
     pancurses::set_title("rush");
     screen.keypad(true);

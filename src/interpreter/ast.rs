@@ -104,10 +104,8 @@ fn parse_exprs(tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, 
 
     loop {
         if let Some(token) = tokenizer.peek() {
-            if !outermost {
-                if token.expect_operator_specific("}").is_ok() {
-                    return Ok(exprs);
-                }
+            if !outermost && token.expect_operator_specific("}").is_ok() {
+                return Ok(exprs);
             }
         } else {
             break;
@@ -140,9 +138,9 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
             if op == ";" {
                 Expr::new(Node::Noop, debug)
             } else if op != "(" {
-                parse_unary_operator(op, debug, tokenizer)?
+                parse_unary_operator(&op, debug, tokenizer)?
             } else {
-                parse_parenthetic_expr(op, debug, tokenizer)?
+                parse_parenthetic_expr(&op, &debug, tokenizer)?
             }
         }
         _ => return Err("Unexpected token")?,
@@ -160,8 +158,8 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
             Some(token) => token,
             None => return Ok(primary_expr),
         };
-        match peek {
-            &Token::Operator(ref op, _) => {
+        match *peek {
+            Token::Operator(ref op, _) => {
                 if op == ")" || op == "(" || op == "!" || op == ";" {
                     return Ok(primary_expr);
                 }
@@ -180,7 +178,7 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
 }
 
 fn parse_unary_operator(
-    op: String,
+    op: &str,
     debug: DebugInfo,
     tokenizer: &mut Tokenizer,
 ) -> Result<Expr, String> {
@@ -190,13 +188,13 @@ fn parse_unary_operator(
 
     if !(op == "!" || op == "-") {
         return Err(
-            debug.to_string() + ", but there is no expression preceding it and '" + &op +
+            debug.to_string() + ", but there is no expression preceding it and '" + op +
                 "' is not a unary operator!",
         )?;
     }
 
     tokenizer.peek().ok_or(
-        debug.to_string() + ", then encountered end of input! '" + &op +
+        debug.to_string() + ", then encountered end of input! '" + op +
             "' must be followed by an expression.",
     )?;
 
@@ -227,9 +225,7 @@ fn op_precendence(op: &str) -> i32 {
         "*" => 40,
         "/" => 50,
         "||" => 5,
-        "==" => 10,
-        "!=" => 10,
-        "&&" => 10,
+        "==" | "!=" | "&&" => 10,
         _ => -1,
     }
 }
@@ -253,7 +249,12 @@ fn operator_expr_from(
             "=" => {
                 match first_expr.node {
                     Node::Ident(id) => Operator::Assign(id, next_expr),
-                    _ => Err(first_expr.debug.to_string() + "; left-hand side of assignment must be an identifier, not an expression.")?,
+                    _ => {
+                        Err(
+                            first_expr.debug.to_string() +
+                                "; left-hand side of assignment must be an identifier, not an expression.",
+                        )?
+                    }
                 }
             }
             _ => {
@@ -317,8 +318,8 @@ fn parse_binary_operator(
     let mut next_precendence = {
         match tokenizer.peek() {
             Some(token) => {
-                match token {
-                    &Token::Operator(ref op, _) => op_precendence(op),
+                match *token {
+                    Token::Operator(ref op, _) => op_precendence(op),
                     _ => -1,
                 }
             }
@@ -346,8 +347,8 @@ fn parse_binary_operator(
 }
 
 fn parse_parenthetic_expr(
-    op: String,
-    debug: DebugInfo,
+    op: &str,
+    debug: &DebugInfo,
     tokenizer: &mut Tokenizer,
 ) -> Result<Expr, String> {
 
@@ -394,7 +395,7 @@ fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
 
     let fake_semicolon = Token::Operator(";".to_string(), DebugInfo::new(";".to_string(), 0));
 
-    let op = match tokenizer.peek().or(Some(&fake_semicolon)).unwrap() {
+    let op = match tokenizer.peek().unwrap_or_else(|| &fake_semicolon) {
         &Token::Operator(ref op, _) if op == ";" || op == ")" => op.clone(),
         token => return token.expect_operator_specific(";"),
     };
@@ -490,8 +491,8 @@ mod tests {
                                             },
                                         ))),
                                     },
-                                ]
-                            }))
+                                ],
+                            })),
                         },
                     ],
                 ))),

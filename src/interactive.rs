@@ -25,14 +25,14 @@ fn print_command(screen: &Window, buffer: &str) -> PResult {
     Ok(())
 }
 
-pub fn input_loop(screen: Window) -> PResult {
+pub fn input_loop(screen: &Window) -> PResult {
     let mut output_buffer = String::from("");
     let mut command_buffer = String::new();
     // let (mut x, mut y) = (0, 0);
     loop {
         screen.clear().unwrap();
-        print_buffer(&screen, &output_buffer)?;
-        print_command(&screen, &command_buffer)?;
+        print_buffer(screen, &output_buffer)?;
+        print_command(screen, &command_buffer)?;
         screen.refresh().unwrap();
         let maybe_next = screen.getch();
         if let Some(next) = maybe_next {

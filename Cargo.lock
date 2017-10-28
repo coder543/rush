@@ -1,11 +1,3 @@
-[root]
-name = "rush"
-version = "0.1.0"
-dependencies = [
- "pancurses 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "try_opt 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
 [[package]]
 name = "gcc"
 version = "0.3.54"
@@ -55,6 +47,14 @@ dependencies = [
 name = "pkg-config"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "rush"
+version = "0.1.0"
+dependencies = [
+ "pancurses 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "try_opt 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "try_opt"

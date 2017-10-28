@@ -69,76 +69,76 @@ pub enum Token {
 #[allow(unused)]
 impl Token {
     pub fn get_debug_info(&self) -> DebugInfo {
-        match self {
-            &Token::Operator(_, ref debug) => debug.clone(),
-            &Token::Str(_, ref debug) => debug.clone(),
-            &Token::Int(_, ref debug) => debug.clone(),
-            &Token::Float(_, ref debug) => debug.clone(),
-            &Token::Bool(_, ref debug) => debug.clone(),
-            &Token::Ident(_, ref debug) => debug.clone(),
-            &Token::Unknown(_, ref debug) => debug.clone(),
+        match *self {
+            Token::Operator(_, ref debug) |
+            Token::Str(_, ref debug) |
+            Token::Int(_, ref debug) |
+            Token::Float(_, ref debug) |
+            Token::Bool(_, ref debug) |
+            Token::Ident(_, ref debug) |
+            Token::Unknown(_, ref debug) => debug.clone(),
         }
     }
 
     pub fn expect_operator(&self, err: &str) -> Result<(), String> {
-        match self {
-            &Token::Operator(_, _) => Ok(()),
+        match *self {
+            Token::Operator(_, _) => Ok(()),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
 
     pub fn expect_operator_specific(&self, op: &str) -> Result<(), String> {
-        match self {
-            &Token::Operator(ref operator, _) if operator == op => Ok(()),
+        match *self {
+            Token::Operator(ref operator, _) if operator == op => Ok(()),
             _ => Err(format!("{}, expected '{}'", self.get_debug_info(), op)),
         }
     }
 
     pub fn expect_str(&self, err: &str) -> Result<(), String> {
-        match self {
-            &Token::Str(_, _) => Ok(()),
+        match *self {
+            Token::Str(_, _) => Ok(()),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
 
     pub fn expect_int(&self, err: &str) -> Result<(), String> {
-        match self {
-            &Token::Int(_, _) => Ok(()),
+        match *self {
+            Token::Int(_, _) => Ok(()),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
 
     pub fn expect_float(&self, err: &str) -> Result<(), String> {
-        match self {
-            &Token::Float(_, _) => Ok(()),
+        match *self {
+            Token::Float(_, _) => Ok(()),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
 
     pub fn expect_ident(&self, err: &str) -> Result<(), String> {
-        match self {
-            &Token::Ident(_, _) => Ok(()),
+        match *self {
+            Token::Ident(_, _) => Ok(()),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
 
     pub fn expect_ident_specific(&self, id: Ident) -> Result<(), String> {
-        match self {
-            &Token::Ident(ref ident, _) if *ident == id => Ok(()),
+        match *self {
+            Token::Ident(ref ident, _) if *ident == id => Ok(()),
             _ => Err(format!("{}, expected '{}'", self.get_debug_info(), id.0)),
         }
     }
 
     pub fn expect_unknown(&self, err: &str) -> Result<(), String> {
-        match self {
-            &Token::Unknown(_, _) => Ok(()),
+        match *self {
+            Token::Unknown(_, _) => Ok(()),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
 
     pub fn expect_unknown_specific(&self, unknown: String, err: &str) -> Result<(), String> {
-        match self {
-            &Token::Unknown(ref unk, _) if *unk == unknown => Ok(()),
+        match *self {
+            Token::Unknown(ref unk, _) if *unk == unknown => Ok(()),
             _ => Err(format!("{}, expected '{}'", self.get_debug_info(), unknown)),
         }
     }
@@ -219,6 +219,8 @@ impl<'a> RushTokenizer<'a> {
                     raw_token = ["\"", &raw_token, "\""].concat();
                     let debug = DebugInfo::new(raw_token, position);
                     return Some(Token::Str(strlit, debug));
+                } else {
+                    return None;
                 }
             }
             next_token = try_opt!(self.next_raw_token());
@@ -249,7 +251,7 @@ impl<'a> RushTokenizer<'a> {
         raw_token.parse().ok()
     }
 
-    fn is_operator(&mut self, raw_token: &str) -> bool {
+    fn is_operator(&self, raw_token: &str) -> bool {
         SYM_OPS.contains(&raw_token) || WORD_OPS.contains(&raw_token)
     }
 
@@ -260,7 +262,7 @@ impl<'a> RushTokenizer<'a> {
         }
 
         for i in 0..raw_token.len() {
-            for op in SYM_OPS.iter() {
+            for op in &SYM_OPS {
                 if raw_token[i..].starts_with(op) {
                     let new = if i == 0 {
                         raw_token.split_off(op.len())

@@ -30,6 +30,5 @@ pub fn run_expression(buffer: &str) -> Result<ExpressionOutput, String> {
             }
             _ => None,
         })
-        .or(Some(Err(format!("could not find {}", buffer))))
-        .unwrap()
+        .unwrap_or_else(|| Err(format!("could not find {}", buffer)))
 }
