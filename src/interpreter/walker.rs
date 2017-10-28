@@ -133,6 +133,5 @@ mod tests {
         let mut expr = Expr::parse("$someInt = 35; $otherInt = $someInt + $whatIsThis;").unwrap();
         let mut memory = HashMap::new();
         let result = expr.run(&mut memory).unwrap();
-        println!("{:#?}\n memory: {:#?}", result, memory);
     }
 }
