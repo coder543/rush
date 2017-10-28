@@ -11,6 +11,13 @@ impl DebugInfo {
         let raw = raw.into();
         DebugInfo { raw, pos }
     }
+
+    pub fn none() -> DebugInfo {
+        DebugInfo {
+            raw: String::from("<unknown>"),
+            pos: 0,
+        }
+    }
 }
 
 impl fmt::Display for DebugInfo {
@@ -25,7 +32,7 @@ impl From<DebugInfo> for String {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Hash)]
 pub struct Ident(pub String);
 
 impl Ident {
@@ -52,6 +59,12 @@ impl Ident {
             }
         }
         Some(Ident(buffer.to_string()))
+    }
+}
+
+impl fmt::Display for Ident {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

@@ -1,4 +1,8 @@
+#![allow(unused)]
+
 use interpreter::tokenizer::*;
+
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Node {
@@ -8,6 +12,7 @@ pub enum Node {
     Int(i64),
     Float(f64),
     Str(String),
+    Return(Box<Expr>),
     Op(Box<Operator>),
     If(Box<If>),
     For(Box<For>),
@@ -33,9 +38,9 @@ pub enum Operator {
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Function {
-    name: Ident,
-    args: Vec<Ident>,
-    body: Vec<Expr>,
+    pub name: Ident,
+    pub args: Vec<Ident>,
+    pub body: Vec<Expr>,
 }
 
 impl Function {
@@ -46,27 +51,27 @@ impl Function {
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct If {
-    condition: Expr,
-    body: Vec<Expr>,
+    pub condition: Expr,
+    pub body: Vec<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct For {
-    loopvar: Ident,
-    iterator: Expr,
-    body: Vec<Expr>,
+    pub loopvar: Ident,
+    pub iterator: Expr,
+    pub body: Vec<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct While {
-    condition: Expr,
-    body: Vec<Expr>,
+    pub condition: Expr,
+    pub body: Vec<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Expr {
-    node: Node,
-    debug: DebugInfo,
+    pub node: Node,
+    pub debug: DebugInfo,
 }
 
 use std::iter::Peekable;
@@ -79,6 +84,7 @@ impl Expr {
     }
 
     pub fn parse(buffer: &str) -> Result<Expr, String> {
+        let ast = AST::new();
         let tokenizer = &mut RushTokenizer::new(buffer).peekable();
         let body = parse_exprs(tokenizer, true)?;
         Ok(Expr {
@@ -89,6 +95,18 @@ impl Expr {
             ))),
             debug: DebugInfo::new(buffer, 0),
         })
+    }
+}
+
+struct AST {
+    memory: HashMap<Ident, Expr>
+}
+
+impl AST {
+    fn new() -> AST {
+        AST {
+            memory: HashMap::new()
+        }
     }
 }
 
@@ -461,6 +479,7 @@ mod tests {
         );
     }
 
+/*
     #[test]
     fn parse_for() {
         let expr = Expr::parse("for $otherInt in $array { $someInt = $otherInt }");
@@ -499,6 +518,7 @@ mod tests {
             })
         );
     }
+*/
 
     #[test]
     fn parse_add() {
