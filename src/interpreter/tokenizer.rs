@@ -157,11 +157,12 @@ impl Token {
     }
 }
 
-static SYM_OPS: [&str; 14] = [
+static SYM_OPS: [&str; 19] = [
     "+",
     "-",
     "*",
     "/",
+    "%",
     "=",
     "!",
     ";",
@@ -169,10 +170,15 @@ static SYM_OPS: [&str; 14] = [
     ")",
     "{",
     "}",
+    ">",
+    "<",
+    ">=",
+    "<=",
     "==",
     "&&",
     "||",
 ];
+
 static WORD_OPS: [&str; 3] = ["or", "and", "not"];
 
 use std::str::Split;

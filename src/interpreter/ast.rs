@@ -28,12 +28,17 @@ pub enum Operator {
     Sub(Expr, Expr),
     Mul(Expr, Expr),
     Div(Expr, Expr),
+    Mod(Expr, Expr),
     Negate(Expr),
     Not(Expr),
     And(Expr, Expr),
     Or(Expr, Expr),
     Equals(Expr, Expr),
     NotEquals(Expr, Expr),
+    Less(Expr, Expr),
+    LessOrEquals(Expr, Expr),
+    Greater(Expr, Expr),
+    GreaterOrEquals(Expr, Expr),
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -239,8 +244,9 @@ fn op_precendence(op: &str) -> i32 {
         "+" => 20,
         "-" => 30,
         "*" => 40,
-        "/" => 50,
+        "/" | "%" => 50,
         "||" => 5,
+        "<" | ">" | "<=" | ">=" => 15,
         "==" | "!=" | "&&" => 10,
         _ => -1,
     }
