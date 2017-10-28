@@ -72,6 +72,8 @@ impl Operator {
                 Ok(Expr::new(Node::Noop, expr.debug.clone()))
             }
 
+            Operator::Call(ref id, ref args) => unimplemented!(),
+
             Operator::Add(ref left, ref right) => {
                 do_binary_op!(+, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => unimplemented!())
             }
@@ -156,7 +158,6 @@ impl Operator {
                     }
                 }
             }
-            _ => unimplemented!(),
         }
     }
 }
