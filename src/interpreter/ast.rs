@@ -116,14 +116,12 @@ fn parse_exprs(mut tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Exp
     }
 }
 
-fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
-
-    let first_token = tokenizer.next().ok_or(
-        "Reached end of input while trying to parse_expr",
+fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
+    let token = tokenizer.next().ok_or(
+        "Reached end of input while trying to parse_primary",
     )?;
-    println!("parse_expr: {:?}", first_token);
-
-    let primary_expr = match first_token {
+    println!("parse_primary: {:?}", token);
+    Ok(match token {
         Token::Ident(id, debug) => Expr::new(Node::Ident(id), debug),
         Token::Int(int, debug) => Expr::new(Node::Int(int), debug),
         Token::Float(float, debug) => Expr::new(Node::Float(float), debug),
@@ -131,16 +129,21 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
         Token::Bool(bool_val, debug) => Expr::new(Node::Bool(bool_val), debug),
         Token::Operator(op, debug) => {
             if op == ";" {
-                return Ok(Expr::new(Node::Noop, debug));
+                Expr::new(Node::Noop, debug)
             } else if op != "(" {
-                let expr = parse_unary_operator(op, debug, tokenizer)?;
-                check_for_semicolon(tokenizer)?;
-                return Ok(expr);
+                parse_unary_operator(op, debug, tokenizer)?
+            } else {
+                parse_parenthetic_expr(op, debug, tokenizer)?
             }
-            parse_parenthetic_expr(op, debug, tokenizer)?
         }
-        _ => unimplemented!(),
-    };
+        _ => return Err("Unexpected token")?,
+    })
+}
+
+fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
+    let primary_expr = parse_primary(tokenizer)?;
+
+    println!("parse_expr");
 
     {
         let peek = match tokenizer.peek() {
@@ -149,7 +152,7 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
         };
         match peek {
             &Token::Operator(ref op, _) => {
-                if op == ")" || op == "(" || op == "!" {
+                if op == ")" || op == "(" || op == "!" || op == ";" {
                     return Ok(primary_expr);
                 }
             }
@@ -159,26 +162,9 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
         }
     }
 
-    let expr = parse_binary_operator(primary_expr, tokenizer)?;
+    let expr = parse_binary_operator(0, primary_expr, tokenizer)?;
 
     Ok(expr)
-
-    // if let Some(second_token) = tokenizer.next() {
-    //     match second_token {
-    //         Token::Operator(op, debug) => {
-    //             if op == ";" {
-    //                 Ok(primary_expr)
-    //             } else {
-    //                 let expr = parse_binary_operator(primary_expr, op, debug, tokenizer)?;
-    //                 check_for_semicolon(tokenizer)?;
-    //                 Ok(expr)
-    //             }
-    //         }
-    //         _ => unimplemented!(),
-    //     }
-    // } else {
-    //     Ok(primary_expr)
-    // }
 }
 
 fn parse_unary_operator(
@@ -220,7 +206,50 @@ fn parse_unary_operator(
     Ok(expr)
 }
 
-fn parse_binary_operator(first_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, String> {
+fn op_precendence(op: &str) -> i32 {
+    match op {
+        "+" => 10,
+        "-" => 20,
+        "*" => 30,
+        "/" => 40,
+        _ => -1,
+    }
+}
+
+fn operator_expr_from(
+    op: &str,
+    debug: &DebugInfo,
+    first_expr: Expr,
+    next_expr: Expr,
+) -> Result<Expr, String> {
+    Ok(Expr::new(
+        Node::Op(Box::new(match op {
+            "+" => Operator::Add(first_expr, next_expr),
+            "-" => Operator::Sub(first_expr, next_expr),
+            "*" => Operator::Mul(first_expr, next_expr),
+            "/" => Operator::Div(first_expr, next_expr),
+            "&&" => Operator::And(first_expr, next_expr),
+            "||" => Operator::Or(first_expr, next_expr),
+            "==" => Operator::Equals(first_expr, next_expr),
+            "!=" => Operator::NotEquals(first_expr, next_expr),
+            _ => {
+                return Err(
+                    debug.to_string() +
+                        ", which caused Rush to experience an internal error! Please report this!",
+                )?
+            }
+        })),
+        debug.clone(),
+    ))
+}
+
+fn parse_binary_operator(
+    last_precedence: i32,
+    first_expr: Expr,
+    tokenizer: &mut Tokenizer,
+) -> Result<Expr, String> {
+
+    println!("parse_binary");
 
     let next_token = tokenizer.next().ok_or(
         "Expected operator, found end of input",
@@ -231,8 +260,6 @@ fn parse_binary_operator(first_expr: Expr, tokenizer: &mut Tokenizer) -> Result<
         _ => unimplemented!(),
     };
 
-    println!("parse_binary: {:?}, {:?}", op, debug);
-
     if op == "!" {
         return Err(
             debug.to_string() + ", but there is an expression preceding it and '" + &op +
@@ -240,34 +267,55 @@ fn parse_binary_operator(first_expr: Expr, tokenizer: &mut Tokenizer) -> Result<
         )?;
     }
 
+    let precendence = op_precendence(&op);
+
+    println!(
+        "parse_binary: {:?}, {:?}, {} < {}",
+        op,
+        debug,
+        precendence,
+        last_precedence
+    );
+
     tokenizer.peek().ok_or(
         debug.to_string() + ", then encountered end of input! '" + &op +
             "' must be followed by an expression.",
     )?;
 
-    let next_expr = parse_expr(tokenizer)?;
+    let next_expr = parse_primary(tokenizer)?;
 
-    let operator = match op.as_ref() {
-        "+" => Operator::Add(first_expr, next_expr),
-        "-" => Operator::Sub(first_expr, next_expr),
-        "*" => Operator::Mul(first_expr, next_expr),
-        "/" => Operator::Div(first_expr, next_expr),
-        "&&" => Operator::And(first_expr, next_expr),
-        "||" => Operator::Or(first_expr, next_expr),
-        "==" => Operator::Equals(first_expr, next_expr),
-        "!=" => Operator::NotEquals(first_expr, next_expr),
-        _ => {
-            return Err(
-                debug.to_string() +
-                    ", which caused Rush to experience an internal error! Please report this!",
-            )?
+    if precendence < last_precedence {
+        return Ok(operator_expr_from(&op, &debug, first_expr, next_expr)?);
+    }
+
+    let mut next_precendence = {
+        match tokenizer.peek() {
+            Some(token) => {
+                match token {
+                    &Token::Operator(ref op, _) => op_precendence(op),
+                    _ => -1,
+                }
+            }
+            None => -1,
         }
     };
 
-    let expr = Expr::new(Node::Op(Box::new(operator)), debug);
+    println!("precedence: {} < {}", precendence, next_precendence);
 
+    let next_expr = if precendence < next_precendence {
+        next_precendence = -1;
+        parse_binary_operator(precendence + 1, next_expr, tokenizer)?
+    } else {
+        next_expr
+    };
 
-    Ok(expr)
+    let expr = operator_expr_from(&op, &debug, first_expr, next_expr)?;
+
+    if next_precendence != -1 {
+        parse_binary_operator(precendence, expr, tokenizer)
+    } else {
+        Ok(expr)
+    }
 }
 
 fn parse_parenthetic_expr(
@@ -304,6 +352,8 @@ fn parse_parenthetic_expr(
             err.push_str(", which has caused an internal error! Please report this!");
             err
         })?;
+
+    println!("returning from parenthetic");
 
     Ok(expr)
 }
@@ -381,9 +431,47 @@ mod tests {
     }
 
     #[test]
+    fn parse_sub_add() {
+        let expr = Expr::parse("$someInt - $otherInt + $neat");
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            node: Node::Op(Box::new(Operator::Add(
+                                Expr {
+                                    node: Node::Op(Box::new(Operator::Sub(
+                                        Expr {
+                                            node: Node::Ident(Ident("$someInt".to_string())),
+                                            debug: DebugInfo::new("$someInt", 0),
+                                        },
+                                        Expr {
+                                            node: Node::Ident(Ident("$otherInt".to_string())),
+                                            debug: DebugInfo::new("$otherInt", 11),
+                                        },
+                                    ))),
+                                    debug: DebugInfo::new("-", 9),
+                                },
+                                Expr {
+                                    node: Node::Ident(Ident("$neat".to_string())),
+                                    debug: DebugInfo::new("$neat", 23),
+                                },
+                            ))),
+                            debug: DebugInfo::new("+", 21),
+                        },
+                    ],
+                ))),
+                debug: DebugInfo::new("$someInt - $otherInt + $neat", 0),
+            })
+        );
+    }
+
+    #[test]
     fn parse_parenthetic() {
         let expr = Expr::parse("$someInt + ($otherInt - $coolInt) / $neat");
-        println!("expr: {:#?}", expr);
         let div = Expr {
             node: Node::Op(Box::new(Operator::Div(
                 Expr {
