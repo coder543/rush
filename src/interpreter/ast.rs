@@ -9,6 +9,7 @@ pub enum Node {
     Float(f64),
     Str(String),
     Op(Box<Operator>),
+    If(Box<If>),
     For(Box<For>),
     While(Box<While>),
     Function(Box<Function>),
@@ -41,6 +42,12 @@ impl Function {
     pub fn new(name: Ident, args: Vec<Ident>, body: Vec<Expr>) -> Function {
         Function { name, args, body }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct If {
+    condition: Expr,
+    body: Vec<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -449,6 +456,45 @@ mod tests {
                     ],
                 ))),
                 debug: DebugInfo::new("$someInt = $otherInt", 0),
+            })
+        );
+    }
+
+    #[test]
+    fn parse_for() {
+        let expr = Expr::parse("for $otherInt in $array { $someInt = $otherInt }");
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                debug: DebugInfo::new("$someInt = $otherInt", 0),
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            debug: DebugInfo::new("for", 0),
+                            node: Node::For(Box::new(For {
+                                loopvar: Ident("$otherInt".to_string()),
+                                iterator: Expr {
+                                    debug: DebugInfo::new("$array", 17),
+                                    node: Node::Ident(Ident("$array".to_string())),
+                                },
+                                body: vec![
+                                    Expr {
+                                        debug: DebugInfo::new("=", 9),
+                                        node: Node::Op(Box::new(Operator::Assign(
+                                            Ident("$someInt".to_string()),
+                                            Expr {
+                                                debug: DebugInfo::new("$otherInt", 11),
+                                                node: Node::Ident(Ident("$otherInt".to_string())),
+                                            },
+                                        ))),
+                                    },
+                                ]
+                            }))
+                        },
+                    ],
+                ))),
             })
         );
     }
