@@ -99,14 +99,12 @@ impl Expr {
 }
 
 struct AST {
-    memory: HashMap<Ident, Expr>
+    memory: HashMap<Ident, Expr>,
 }
 
 impl AST {
     fn new() -> AST {
-        AST {
-            memory: HashMap::new()
-        }
+        AST { memory: HashMap::new() }
     }
 }
 
@@ -270,7 +268,7 @@ fn operator_expr_from(
                     _ => {
                         Err(
                             first_expr.debug.to_string() +
-                                "; left-hand side of assignment must be an identifier, not an expression.",
+                                "; left-hand side of assignment must be an identifier.",
                         )?
                     }
                 }
@@ -479,7 +477,7 @@ mod tests {
         );
     }
 
-/*
+    /*
     #[test]
     fn parse_for() {
         let expr = Expr::parse("for $otherInt in $array { $someInt = $otherInt }");
