@@ -264,10 +264,15 @@ fn operator_expr_from(
             "-" => Operator::Sub(first_expr, next_expr),
             "*" => Operator::Mul(first_expr, next_expr),
             "/" => Operator::Div(first_expr, next_expr),
+            "%" => Operator::Mod(first_expr, next_expr),
             "&&" => Operator::And(first_expr, next_expr),
             "||" => Operator::Or(first_expr, next_expr),
             "==" => Operator::Equals(first_expr, next_expr),
             "!=" => Operator::NotEquals(first_expr, next_expr),
+            "<" => Operator::Less(first_expr, next_expr),
+            "<=" => Operator::LessOrEquals(first_expr, next_expr),
+            ">" => Operator::Greater(first_expr, next_expr),
+            ">=" => Operator::GreaterOrEquals(first_expr, next_expr),
             "=" => {
                 match first_expr.node {
                     Node::Ident(id) => Operator::Assign(id, next_expr),
