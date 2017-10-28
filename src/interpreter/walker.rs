@@ -8,7 +8,7 @@ use std::collections::HashMap;
 pub type Memory = HashMap<Ident, Expr>;
 
 impl Expr {
-    fn run(&mut self, memory: &mut Memory) -> Result<Expr, String> {
+    fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
         match self.node {
             Node::Ident(ref id) => {
                 memory
@@ -18,22 +18,22 @@ impl Expr {
                     })
                     .map(|val| val.clone())
             }
-            Node::Op(ref mut operator) => operator.run(memory),
-            Node::Function(ref mut function) => function.run(memory, Vec::new()),
+            Node::Op(ref operator) => operator.run(memory),
+            Node::Function(ref function) => function.run(memory, Vec::new()),
             _ => Ok(self.clone()),
         }
     }
 }
 
 impl Operator {
-    fn run(&mut self, memory: &mut Memory) -> Result<Expr, String> {
+    fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
         match *self {
-            Operator::Assign(ref id, ref mut expr) => {
+            Operator::Assign(ref id, ref expr) => {
                 let val = expr.run(memory)?;
                 memory.insert(id.clone(), val);
                 Ok(Expr::new(Node::Noop, expr.debug.clone()))
             }
-            Operator::Add(ref mut left, ref mut right) => {
+            Operator::Add(ref left, ref right) => {
                 let left_res = left.run(memory)?;
                 let right_res = right.run(memory)?;
                 match (left_res.node, right_res.node) {
@@ -64,7 +64,7 @@ fn revert_scope_after<T>(val: T, scope: Vec<Ident>, memory: &mut Memory) -> T {
 }
 
 impl Function {
-    fn run(&mut self, memory: &mut Memory, args: Vec<Expr>) -> Result<Expr, String> {
+    fn run(&self, memory: &mut Memory, args: Vec<Expr>) -> Result<Expr, String> {
         if self.args.len() != args.len() {
             return Err(format!(
                 "Function {} called with incorrect number of arguments. Expected {} but found {}.",
@@ -77,7 +77,7 @@ impl Function {
         for (id, val) in self.args.iter().zip(args) {
             memory.insert(id.clone(), val);
         }
-        for mut expr in &mut self.body {
+        for mut expr in &self.body {
             match expr.node {
                 Node::Return(_) => return revert_scope_after(expr.run(memory), scope, memory),
                 _ => expr.run(memory)?,
@@ -104,26 +104,26 @@ mod tests {
     #[test]
     fn walk_assign() {
         let mut expr = Expr::parse("$someInt = 35").unwrap();
-        let mut memory = HashMap::new();
+        let mut memory = &mut HashMap::new();
 
         // create $someInt outside the scope of the anonymous outer function that
         // Expr::parse returns, that way the effect of the assignment can be seen here.
-        create_global("$someInt");
+        create_global("$someInt", memory);
 
-        let result = expr.run(&mut memory).unwrap();
+        let result = expr.run(memory).unwrap();
         println!("{:#?}\n memory: {:#?}", result, memory);
     }
 
     #[test]
     fn walk_assign2() {
         let mut expr = Expr::parse("$otherInt = 35; $someInt = $otherInt + 2;").unwrap();
-        let mut memory = HashMap::new();
+        let mut memory = &mut HashMap::new();
 
         // create $someInt outside the scope of the anonymous outer function that
         // Expr::parse returns, that way the effect of the assignment can be seen here.
-        create_global("$someInt");
+        create_global("$someInt", memory);
 
-        let result = expr.run(&mut memory).unwrap();
+        let result = expr.run(memory).unwrap();
         println!("{:#?}\n memory: {:#?}", result, memory);
     }
 
@@ -131,7 +131,7 @@ mod tests {
     #[should_panic]
     fn walk_assign_undefined() {
         let mut expr = Expr::parse("$someInt = 35; $otherInt = $someInt + $whatIsThis;").unwrap();
-        let mut memory = HashMap::new();
-        let result = expr.run(&mut memory).unwrap();
+        let mut memory = &mut HashMap::new();
+        let result = expr.run(memory).unwrap();
     }
 }
