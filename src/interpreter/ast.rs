@@ -185,16 +185,26 @@ fn parse_for(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String
 }
 
 fn parse_if(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
+    println!("parse_if");
     let condition = parse_expr(tokenizer)?;
 
     let true_body = parse_exprs(tokenizer, false)?;
 
-    tokenizer
-        .next()
-        .ok_or(
-            debug.to_string() + ", reached end of input while trying to parse if statement",
-        )?
-        .expect_unknown_specific("else")?;
+    match tokenizer.next().map(|token| {
+        token.expect_unknown_specific("else")
+    }) {
+        Some(Ok(_)) => {}
+        None | Some(Err(_)) => {
+            return Ok(Expr::new(
+                Node::If(Box::new(If {
+                    condition,
+                    true_body,
+                    else_body: Vec::new(),
+                })),
+                debug,
+            ))
+        }
+    }
 
 
     {
@@ -669,13 +679,13 @@ mod tests {
     #[test]
     fn parse_if() {
         let expr = Expr::parse(
-            "if $otherInt == $array { $someInt = $otherInt } else { $test = 3 }",
+            "if $otherInt == 4 { $someInt = $otherInt } else { $someInt = 3 }",
         );
         assert_eq!(
             expr,
             Ok(Expr {
                 debug: DebugInfo::new(
-                    "if $otherInt == $array { $someInt = $otherInt } else { $test = 3 }",
+                    "if $otherInt == 4 { $someInt = $otherInt } else { $someInt = 3 }",
                     0,
                 ),
                 node: Node::Function(Box::new(Function::new(
@@ -683,21 +693,41 @@ mod tests {
                     Vec::new(),
                     vec![
                         Expr {
-                            debug: DebugInfo::new("for", 0),
+                            debug: DebugInfo::new("if", 0),
                             node: Node::If(Box::new(If {
-                                conditional: Ident("$otherInt".to_string()),
-                                iterator: Expr {
-                                    debug: DebugInfo::new("$array", 17),
-                                    node: Node::Ident(Ident("$array".to_string())),
+                                condition: Expr {
+                                    node: Node::Op(Box::new(Operator::Equals(
+                                        Expr {
+                                            node: Node::Ident(Ident("$otherInt".to_string())),
+                                            debug: DebugInfo::new("$otherInt", 3),
+                                        },
+                                        Expr {
+                                            node: Node::Int(4),
+                                            debug: DebugInfo::new("4", 16),
+                                        },
+                                    ))),
+                                    debug: DebugInfo::new("==", 13),
                                 },
-                                body: vec![
+                                true_body: vec![
                                     Expr {
-                                        debug: DebugInfo::new("=", 35),
+                                        debug: DebugInfo::new("=", 29),
                                         node: Node::Op(Box::new(Operator::Assign(
                                             Ident("$someInt".to_string()),
                                             Expr {
-                                                debug: DebugInfo::new("$otherInt", 37),
+                                                debug: DebugInfo::new("$otherInt", 31),
                                                 node: Node::Ident(Ident("$otherInt".to_string())),
+                                            },
+                                        ))),
+                                    },
+                                ],
+                                else_body: vec![
+                                    Expr {
+                                        debug: DebugInfo::new("=", 59),
+                                        node: Node::Op(Box::new(Operator::Assign(
+                                            Ident("$someInt".to_string()),
+                                            Expr {
+                                                node: Node::Int(3),
+                                                debug: DebugInfo::new("3", 61),
                                             },
                                         ))),
                                     },

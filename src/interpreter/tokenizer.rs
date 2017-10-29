@@ -158,6 +158,11 @@ impl Token {
 }
 
 static SYM_OPS: [&str; 19] = [
+    ">=",
+    "<=",
+    "==",
+    "&&",
+    "||",
     "+",
     "-",
     "*",
@@ -172,11 +177,6 @@ static SYM_OPS: [&str; 19] = [
     "}",
     ">",
     "<",
-    ">=",
-    "<=",
-    "==",
-    "&&",
-    "||",
 ];
 
 static WORD_OPS: [&str; 3] = ["or", "and", "not"];
@@ -289,6 +289,9 @@ impl<'a> RushTokenizer<'a> {
                         raw_token.split_off(i)
                     };
 
+                    if new.len() == 0 {
+                        return;
+                    }
                     self.last_len -= new.len() as u64;
                     self.ready_tokens.push_front(new);
                     self.last_len -= 1;
