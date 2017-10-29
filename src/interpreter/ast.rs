@@ -151,7 +151,14 @@ fn parse_exprs(tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, 
 }
 
 fn parse_while(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
-    unimplemented!();
+    let condition = parse_expr(tokenizer)?;
+
+    let body = parse_exprs(tokenizer, false)?;
+
+    Ok(Expr::new(
+        Node::While(Box::new(While { condition, body })),
+        debug,
+    ))
 }
 
 fn parse_for(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
@@ -663,6 +670,54 @@ mod tests {
                                             Expr {
                                                 debug: DebugInfo::new("$otherInt", 37),
                                                 node: Node::Ident(Ident("$otherInt".to_string())),
+                                            },
+                                        ))),
+                                    },
+                                ],
+                            })),
+                        },
+                    ],
+                ))),
+            })
+        );
+    }
+
+
+    #[test]
+    fn parse_while() {
+        let expr = Expr::parse("while $otherInt == $something { $otherInt = $someInt }");
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                debug: DebugInfo::new("while $otherInt == $something { $otherInt = $someInt }", 0),
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            debug: DebugInfo::new("while", 0),
+                            node: Node::While(Box::new(While {
+                                condition: Expr {
+                                    node: Node::Op(Box::new(Operator::Equals(
+                                        Expr {
+                                            node: Node::Ident(Ident("$otherInt".to_string())),
+                                            debug: DebugInfo::new("$otherInt", 6),
+                                        },
+                                        Expr {
+                                            node: Node::Ident(Ident("$something".to_string())),
+                                            debug: DebugInfo::new("$something", 19),
+                                        },
+                                    ))),
+                                    debug: DebugInfo::new("==", 16),
+                                },
+                                body: vec![
+                                    Expr {
+                                        debug: DebugInfo::new("=", 42),
+                                        node: Node::Op(Box::new(Operator::Assign(
+                                            Ident("$otherInt".to_string()),
+                                            Expr {
+                                                debug: DebugInfo::new("$someInt", 44),
+                                                node: Node::Ident(Ident("$someInt".to_string())),
                                             },
                                         ))),
                                     },
