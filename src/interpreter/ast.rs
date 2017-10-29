@@ -267,7 +267,57 @@ fn parse_if(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String>
 }
 
 fn parse_fn(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
-    unimplemented!();
+    let name = tokenizer
+        .next()
+        .ok_or(
+            debug.to_string() + ", reached end of input while trying to parse function declaration.",
+        )?
+        .expect_ident("The function name must be a simple identifier.")?;
+
+    tokenizer
+        .next()
+        .ok_or(
+            debug.to_string() + ", reached end of input while trying to parse function declaration",
+        )?
+        .expect_operator_specific("(")?;
+
+    let mut args = Vec::new();
+    loop {
+        let arg = match tokenizer.next() {
+            Some(Token::Ident(id, debug)) => id,
+            Some(Token::Operator(ref op, _)) if op == ")" => break,
+            None => {
+                Err(
+                    debug.to_string() +
+                        ", reached end of input while trying to parse function declaration",
+                )?
+            }
+            _ => {
+                Err(
+                    debug.to_string() + ", each function arg must be a simple identifier.",
+                )?
+            }
+        };
+
+        args.push(arg);
+
+        match tokenizer.next() {
+            Some(Token::Operator(ref op, _)) if op == ")" => break,
+            Some(Token::Operator(ref op, _)) if op == "," => {}
+            _ => {
+                Err(
+                    debug.to_string() + ", expected ')' or ',' while parsing function arguments.",
+                )?
+            }
+        }
+    }
+
+    let body = parse_exprs(tokenizer, false)?;
+
+    Ok(Expr::new(
+        Node::Function(Box::new(Function { name, args, body })),
+        debug,
+    ))
 }
 
 fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, String> {
@@ -638,6 +688,42 @@ mod tests {
                     ],
                 ))),
                 debug: DebugInfo::new("$someInt = $otherInt", 0),
+            })
+        );
+    }
+
+    #[test]
+    fn parse_function() {
+        let expr = Expr::parse("fn $test($otherInt) { $someInt = $otherInt; }");
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            node: Node::Function(Box::new(Function::new(
+                                Ident(String::from("$test")),
+                                vec![Ident("$otherInt".to_string())],
+                                vec![
+                                    Expr {
+                                        node: Node::Op(Box::new(Operator::Assign(
+                                            Ident("$someInt".to_string()),
+                                            Expr {
+                                                node: Node::Ident(Ident("$otherInt".to_string())),
+                                                debug: DebugInfo::new("$otherInt", 33),
+                                            },
+                                        ))),
+                                        debug: DebugInfo::new("=", 31),
+                                    },
+                                ],
+                            ))),
+                            debug: DebugInfo::new("fn", 0),
+                        },
+                    ],
+                ))),
+                debug: DebugInfo::new("fn $test($otherInt) { $someInt = $otherInt; }", 0),
             })
         );
     }
