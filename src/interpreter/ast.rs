@@ -57,7 +57,8 @@ impl Function {
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct If {
     pub condition: Expr,
-    pub body: Vec<Expr>,
+    pub true_body: Vec<Expr>,
+    pub else_body: Vec<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -166,7 +167,7 @@ fn parse_for(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String
         .ok_or(
             debug.to_string() + ", reached end of input while trying to parse for loop",
         )?
-        .expect_unknown_specific("in");
+        .expect_unknown_specific("in")?;
 
     let iterator = parse_expr(tokenizer)?;
 
@@ -184,7 +185,68 @@ fn parse_for(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String
 }
 
 fn parse_if(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
-    unimplemented!();
+    let condition = parse_expr(tokenizer)?;
+
+    let true_body = parse_exprs(tokenizer, false)?;
+
+    tokenizer
+        .next()
+        .ok_or(
+            debug.to_string() + ", reached end of input while trying to parse if statement",
+        )?
+        .expect_unknown_specific("else")?;
+
+
+    {
+        let peek = match tokenizer.peek() {
+            Some(token) => token,
+            None => {
+                return Ok(Expr::new(
+                    Node::If(Box::new(If {
+                        condition,
+                        true_body,
+                        else_body: Vec::new(),
+                    })),
+                    debug,
+                ))
+            }
+        };
+        match *peek {
+            Token::Operator(ref op, _) => {
+                if op != "{" {
+                    return Ok(Expr::new(
+                        Node::If(Box::new(If {
+                            condition,
+                            true_body,
+                            else_body: Vec::new(),
+                        })),
+                        debug,
+                    ));
+                }
+            }
+            _ => {
+                return Ok(Expr::new(
+                    Node::If(Box::new(If {
+                        condition,
+                        true_body,
+                        else_body: Vec::new(),
+                    })),
+                    debug,
+                ));
+            }
+        }
+    }
+
+    let else_body = parse_exprs(tokenizer, false)?;
+
+    Ok(Expr::new(
+        Node::If(Box::new(If {
+            condition,
+            true_body,
+            else_body,
+        })),
+        debug,
+    ))
 }
 
 fn parse_fn(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
@@ -579,6 +641,51 @@ mod tests {
                             debug: DebugInfo::new("for", 0),
                             node: Node::For(Box::new(For {
                                 loopvar: Ident("$otherInt".to_string()),
+                                iterator: Expr {
+                                    debug: DebugInfo::new("$array", 17),
+                                    node: Node::Ident(Ident("$array".to_string())),
+                                },
+                                body: vec![
+                                    Expr {
+                                        debug: DebugInfo::new("=", 35),
+                                        node: Node::Op(Box::new(Operator::Assign(
+                                            Ident("$someInt".to_string()),
+                                            Expr {
+                                                debug: DebugInfo::new("$otherInt", 37),
+                                                node: Node::Ident(Ident("$otherInt".to_string())),
+                                            },
+                                        ))),
+                                    },
+                                ],
+                            })),
+                        },
+                    ],
+                ))),
+            })
+        );
+    }
+
+
+    #[test]
+    fn parse_if() {
+        let expr = Expr::parse(
+            "if $otherInt == $array { $someInt = $otherInt } else { $test = 3 }",
+        );
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                debug: DebugInfo::new(
+                    "if $otherInt == $array { $someInt = $otherInt } else { $test = 3 }",
+                    0,
+                ),
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            debug: DebugInfo::new("for", 0),
+                            node: Node::If(Box::new(If {
+                                conditional: Ident("$otherInt".to_string()),
                                 iterator: Expr {
                                     debug: DebugInfo::new("$array", 17),
                                     node: Node::Ident(Ident("$array".to_string())),
