@@ -124,12 +124,20 @@ fn parse_exprs(tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, 
     let mut exprs = Vec::new();
 
     loop {
+        let consume;
         if let Some(token) = tokenizer.peek() {
+            println!("parse_exprs: found token {:?}", token);
             if !outermost && token.expect_operator_specific("}").is_ok() {
-                return Ok(exprs);
+                consume = true;
+            } else {
+                consume = false;
             }
         } else {
             break;
+        }
+        if consume {
+            tokenizer.next();
+            return Ok(exprs);
         }
         exprs.push(parse_expr(tokenizer)?)
     }
@@ -139,6 +147,56 @@ fn parse_exprs(tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, 
     } else {
         Err("Expected '}', reached end of input instead!")?
     }
+}
+
+fn parse_while(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
+    unimplemented!();
+}
+
+fn parse_for(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
+    let loopvar = tokenizer
+        .next()
+        .ok_or(
+            debug.to_string() + ", reached end of input while trying to parse for loop.",
+        )?
+        .expect_ident("The loop iterator must be a simple identifier.")?;
+
+    tokenizer
+        .next()
+        .ok_or(
+            debug.to_string() + ", reached end of input while trying to parse for loop",
+        )?
+        .expect_unknown_specific("in");
+
+    let iterator = parse_expr(tokenizer)?;
+
+    let body = parse_exprs(tokenizer, false)?;
+
+    Ok(Expr::new(
+        Node::For(Box::new(For {
+            loopvar,
+            iterator,
+            body,
+        })),
+        debug,
+    ))
+
+}
+
+fn parse_if(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
+    unimplemented!();
+}
+
+fn parse_fn(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
+    unimplemented!();
+}
+
+fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, String> {
+    unimplemented!();
+}
+
+fn parse_cmd(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
+    unimplemented!();
 }
 
 fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
@@ -164,6 +222,15 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
                 parse_parenthetic_expr(&op, &debug, tokenizer)?
             }
         }
+        Token::Unknown(unknown, debug) => {
+            match unknown.as_str() {
+                "while" => parse_while(tokenizer, debug)?,
+                "for" => parse_for(tokenizer, debug)?,
+                "if" => parse_if(tokenizer, debug)?,
+                "fn" => parse_fn(tokenizer, debug)?,
+                _ => parse_cmd(tokenizer, debug)?,
+            }
+        }
         _ => return Err("Unexpected token")?,
     })
 }
@@ -174,6 +241,8 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
     #[cfg(test)]
     println!("parse_expr");
 
+    let mut fn_call = false;
+
     {
         let peek = match tokenizer.peek() {
             Some(token) => token,
@@ -181,8 +250,10 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
         };
         match *peek {
             Token::Operator(ref op, _) => {
-                if op == ")" || op == "(" || op == "!" || op == ";" {
+                if op == ")" || op == "!" || op == ";" || op == "{" || op == "}" {
                     return Ok(primary_expr);
+                } else if op == "(" {
+                    fn_call = true;
                 }
             }
             _ => {
@@ -191,11 +262,13 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
         }
     }
 
-    let expr = parse_binary_operator(0, primary_expr, tokenizer)?;
-
-    check_for_end_of_expr(tokenizer)?;
-
-    Ok(expr)
+    if fn_call {
+        Ok(parse_fn_call(primary_expr, tokenizer)?)
+    } else {
+        let expr = parse_binary_operator(0, primary_expr, tokenizer)?;
+        check_for_end_of_expr(tokenizer)?;
+        Ok(expr)
+    }
 }
 
 fn parse_unary_operator(
@@ -423,7 +496,9 @@ fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
     let fake_semicolon = Token::Operator(";".to_string(), DebugInfo::new(";".to_string(), 0));
 
     let op = match tokenizer.peek().unwrap_or_else(|| &fake_semicolon) {
-        &Token::Operator(ref op, _) if op == ";" || op == ")" => op.clone(),
+        &Token::Operator(ref op, _) if op == ";" || op == ")" || op == "{" || op == "}" => {
+            op.clone()
+        }
         token => return token.expect_operator_specific(";"),
     };
     // use up the semicolon if it is there
@@ -488,14 +563,14 @@ mod tests {
         );
     }
 
-    /*
+
     #[test]
     fn parse_for() {
         let expr = Expr::parse("for $otherInt in $array { $someInt = $otherInt }");
         assert_eq!(
             expr,
             Ok(Expr {
-                debug: DebugInfo::new("$someInt = $otherInt", 0),
+                debug: DebugInfo::new("for $otherInt in $array { $someInt = $otherInt }", 0),
                 node: Node::Function(Box::new(Function::new(
                     Ident(String::from("<anonymous>")),
                     Vec::new(),
@@ -510,11 +585,11 @@ mod tests {
                                 },
                                 body: vec![
                                     Expr {
-                                        debug: DebugInfo::new("=", 9),
+                                        debug: DebugInfo::new("=", 35),
                                         node: Node::Op(Box::new(Operator::Assign(
                                             Ident("$someInt".to_string()),
                                             Expr {
-                                                debug: DebugInfo::new("$otherInt", 11),
+                                                debug: DebugInfo::new("$otherInt", 37),
                                                 node: Node::Ident(Ident("$otherInt".to_string())),
                                             },
                                         ))),
@@ -527,7 +602,7 @@ mod tests {
             })
         );
     }
-*/
+
 
     #[test]
     fn parse_add() {

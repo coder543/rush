@@ -93,9 +93,9 @@ impl Token {
         }
     }
 
-    pub fn expect_operator(&self, err: &str) -> Result<(), String> {
+    pub fn expect_operator(&self, err: &str) -> Result<String, String> {
         match *self {
-            Token::Operator(_, _) => Ok(()),
+            Token::Operator(ref op, _) => Ok(op.clone()),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
@@ -107,30 +107,30 @@ impl Token {
         }
     }
 
-    pub fn expect_str(&self, err: &str) -> Result<(), String> {
+    pub fn expect_str(&self, err: &str) -> Result<String, String> {
         match *self {
-            Token::Str(_, _) => Ok(()),
+            Token::Str(ref str_val, _) => Ok(str_val.clone()),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
 
-    pub fn expect_int(&self, err: &str) -> Result<(), String> {
+    pub fn expect_int(&self, err: &str) -> Result<i64, String> {
         match *self {
-            Token::Int(_, _) => Ok(()),
+            Token::Int(int, _) => Ok(int),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
 
-    pub fn expect_float(&self, err: &str) -> Result<(), String> {
+    pub fn expect_float(&self, err: &str) -> Result<f64, String> {
         match *self {
-            Token::Float(_, _) => Ok(()),
+            Token::Float(float, _) => Ok(float),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
 
-    pub fn expect_ident(&self, err: &str) -> Result<(), String> {
+    pub fn expect_ident(&self, err: &str) -> Result<Ident, String> {
         match *self {
-            Token::Ident(_, _) => Ok(()),
+            Token::Ident(ref id, _) => Ok(id.clone()),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
@@ -142,14 +142,14 @@ impl Token {
         }
     }
 
-    pub fn expect_unknown(&self, err: &str) -> Result<(), String> {
+    pub fn expect_unknown(&self, err: &str) -> Result<String, String> {
         match *self {
-            Token::Unknown(_, _) => Ok(()),
+            Token::Unknown(ref unknown, _) => Ok(unknown.clone()),
             _ => Err(format!("{}, {}", self.get_debug_info(), err)),
         }
     }
 
-    pub fn expect_unknown_specific(&self, unknown: String, err: &str) -> Result<(), String> {
+    pub fn expect_unknown_specific(&self, unknown: &str) -> Result<(), String> {
         match *self {
             Token::Unknown(ref unk, _) if *unk == unknown => Ok(()),
             _ => Err(format!("{}, expected '{}'", self.get_debug_info(), unknown)),
