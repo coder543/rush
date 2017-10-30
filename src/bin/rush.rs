@@ -6,8 +6,9 @@ fn main() {
     if args().len() == 1 {
         rush::start_interactive();
     } else {
-        for arg in args().skip(1) {
-            run_file(&arg);
-        }
+        let mut arglist = args().skip(1);
+        let script = arglist.next().unwrap();
+        let args = arglist.collect();
+        run_file(&script, args);
     }
 }

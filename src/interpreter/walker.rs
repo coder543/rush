@@ -97,58 +97,58 @@ impl Operator {
             }
 
             Operator::Add(ref left, ref right) => {
-                do_binary_op!(+, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => unimplemented!())
+                do_binary_op!(+, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => Err(left.debug.to_string() + ", " + &right.debug.to_string() + ", but these cannot be added.")?)
             }
             Operator::Sub(ref left, ref right) => {
-                do_binary_op!(-, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => unimplemented!())
+                do_binary_op!(-, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => Err(left.debug.to_string() + ", " + &right.debug.to_string() + ", but these cannot be subtracted.")?)
             }
             Operator::Mul(ref left, ref right) => {
-                do_binary_op!(*, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => unimplemented!())
+                do_binary_op!(*, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => Err(left.debug.to_string() + ", " + &right.debug.to_string() + ", but these cannot be multiplied.")?)
             }
             Operator::Div(ref left, ref right) => {
-                do_binary_op!(/, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => unimplemented!())
+                do_binary_op!(/, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => Err(left.debug.to_string() + ", " + &right.debug.to_string() + ", but these cannot be divided.")?)
             }
             Operator::Mod(ref left, ref right) => {
-                do_binary_op!(%, memory, left, right, (Int, Int -> (Int:i64));; _ => unimplemented!())
+                do_binary_op!(%, memory, left, right, (Int, Int -> (Int:i64));; _ => Err(left.debug.to_string() + ", " + &right.debug.to_string() + ", but these cannot be divided.")?)
             }
             Operator::And(ref left, ref right) => {
                 do_binary_op!(&&, memory, left, right, (Bool, Bool -> (Bool:bool));; _ => Err(
-                            left.debug.to_string() + &right.debug.to_string() +
+                            left.debug.to_string() + ", " + &right.debug.to_string() +
                             ", attempt to use logical AND on something which is not a boolean")?)
             }
             Operator::Or(ref left, ref right) => {
                 do_binary_op!(||, memory, left, right, (Bool, Bool -> (Bool:bool));; _ => Err(
-                            left.debug.to_string() + &right.debug.to_string() +
+                            left.debug.to_string() + ", " + &right.debug.to_string() +
                             ", attempt to use logical OR on something which is not a boolean")?)
             }
             Operator::Less(ref left, ref right) => {
                 do_binary_op!(<, memory, left, right, (Int, Int -> (Bool:i64)), (Float, Float -> (Bool:f64)), (Float, Int -> (Bool:f64)), (Int, Float -> (Bool:f64)); (Str, Str -> (Bool)); _ => Err(
-                            left.debug.to_string() + &right.debug.to_string() +
+                            left.debug.to_string() + ", " + &right.debug.to_string() +
                             ", attempt to compare two values for equality which cannot be compared")?)
             }
             Operator::LessOrEquals(ref left, ref right) => {
                 do_binary_op!(<=, memory, left, right, (Int, Int -> (Bool:i64)), (Float, Float -> (Bool:f64)), (Float, Int -> (Bool:f64)), (Int, Float -> (Bool:f64)); (Str, Str -> (Bool)); _ => Err(
-                            left.debug.to_string() + &right.debug.to_string() +
+                            left.debug.to_string() + ", " + &right.debug.to_string() +
                             ", attempt to compare two values for equality which cannot be compared")?)
             }
             Operator::Greater(ref left, ref right) => {
                 do_binary_op!(>, memory, left, right, (Int, Int -> (Bool:i64)), (Float, Float -> (Bool:f64)), (Float, Int -> (Bool:f64)), (Int, Float -> (Bool:f64)); (Str, Str -> (Bool)); _ => Err(
-                            left.debug.to_string() + &right.debug.to_string() +
+                            left.debug.to_string() + ", " + &right.debug.to_string() +
                             ", attempt to compare two values for equality which cannot be compared")?)
             }
             Operator::GreaterOrEquals(ref left, ref right) => {
                 do_binary_op!(>=, memory, left, right, (Int, Int -> (Bool:i64)), (Float, Float -> (Bool:f64)), (Float, Int -> (Bool:f64)), (Int, Float -> (Bool:f64)); (Str, Str -> (Bool)); _ => Err(
-                            left.debug.to_string() + &right.debug.to_string() +
+                            left.debug.to_string() + ", " + &right.debug.to_string() +
                             ", attempt to compare two values for equality which cannot be compared")?)
             }
             Operator::Equals(ref left, ref right) => {
                 do_binary_op!(==, memory, left, right,; (Int, Int -> (Bool)), (Float, Float -> (Bool)), (Str, Str -> (Bool)), (Bool, Bool -> (Bool)); _ => Err(
-                            left.debug.to_string() + &right.debug.to_string() +
+                            left.debug.to_string() + ", " + &right.debug.to_string() +
                             ", attempt to compare two values for equality which cannot be compared")?)
             }
             Operator::NotEquals(ref left, ref right) => {
                 do_binary_op!(!=, memory, left, right,; (Int, Int -> (Bool)), (Float, Float -> (Bool)), (Str, Str -> (Bool)), (Bool, Bool -> (Bool)); _ => Err(
-                            left.debug.to_string() + &right.debug.to_string() +
+                            left.debug.to_string() + ", " + &right.debug.to_string() +
                             ", attempt to compare two values for equality which cannot be compared")?)
             }
 

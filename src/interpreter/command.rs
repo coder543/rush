@@ -2,6 +2,7 @@ use std::time::Instant;
 use std::collections::HashMap;
 
 use interpreter::ast::*;
+use interpreter::tokenizer::{Ident, DebugInfo};
 
 // Obviously just a rough sketch
 // These fields will need to be rethought
@@ -15,10 +16,18 @@ pub struct ExpressionOutput {
     pub completed: Instant,
 }
 
-pub fn run_expression(buffer: &str) -> Result<ExpressionOutput, String> {
+pub fn run_expression(
+    buffer: &str,
+    mut commandline: Vec<String>,
+) -> Result<ExpressionOutput, String> {
 
     let expr = Expr::parse(buffer)?;
     let memory = &mut HashMap::new();
+
+    for (i, arg) in commandline.drain(..).enumerate() {
+        memory.insert(Ident(format!("$arg{}", i)), Expr::parse_one(&arg)?);
+    }
+
     let result = expr.run(memory).unwrap();
 
     let output = format!("{:?}", result.node);

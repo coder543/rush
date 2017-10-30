@@ -103,6 +103,11 @@ impl Expr {
             debug: DebugInfo::new(buffer, 0),
         })
     }
+
+    pub fn parse_one(buffer: &str) -> Result<Expr, String> {
+        let tokenizer = &mut RushTokenizer::new(buffer).peekable();
+        parse_expr(tokenizer)
+    }
 }
 
 struct AST {
@@ -329,7 +334,49 @@ fn parse_fn(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String>
 }
 
 fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, String> {
-    unimplemented!();
+    let fn_name = match primary_expr.node {
+        Node::Ident(id) => id,
+        _ => Err("The function name must be a simple identifier.")?
+    };
+
+    let debug = primary_expr.debug;
+
+    tokenizer
+        .next()
+        .ok_or(
+            debug.to_string() + ", reached end of input while trying to parse function call",
+        )?
+        .expect_operator_specific("(")?;
+
+    let mut args = Vec::new();
+
+    loop {
+        let expr = parse_expr(tokenizer)?;
+        args.push(expr);
+        let peek = match tokenizer.peek() {
+            Some(token) => token,
+            None => {
+                Err(debug.to_string() + ", reached end of input while trying to parse function call")?
+            }
+        };
+        match *peek {
+            Token::Operator(ref op, _) => {
+                if op == ")" {
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    tokenizer
+        .next()
+        .ok_or(
+            debug.to_string() + ", reached end of input while trying to parse function call",
+        )?
+        .expect_operator_specific(")")?;
+
+    Ok(Expr::new(Node::Op(Box::new(Operator::Call(fn_name, args))), debug))
 }
 
 fn parse_cmd(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
@@ -634,7 +681,7 @@ fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
     let fake_semicolon = Token::Operator(";".to_string(), DebugInfo::new(";".to_string(), 0));
 
     let op = match tokenizer.peek().unwrap_or_else(|| &fake_semicolon) {
-        &Token::Operator(ref op, _) if op == ";" || op == ")" || op == "{" || op == "}" => {
+        &Token::Operator(ref op, _) if op == ";" || op == ")" || op == "{" || op == "}" || op == "," => {
             op.clone()
         }
         token => return token.expect_operator_specific(";"),

@@ -47,7 +47,7 @@ pub fn input_loop(screen: &Window) -> PResult {
                         continue;
                     }
                     output_buffer += "$ ";
-                    let output = run_expression(&command_buffer);
+                    let output = run_expression(&command_buffer, vec![]);
                     match output {
                         Ok(output) => {
                             output_buffer += &output.command;
