@@ -363,6 +363,7 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
                 "for" => parse_for(tokenizer, debug)?,
                 "if" => parse_if(tokenizer, debug)?,
                 "fn" => parse_fn(tokenizer, debug)?,
+                "return" => Expr::new(Node::Return(Box::new(parse_expr(tokenizer)?)), debug),
                 _ => parse_cmd(tokenizer, debug)?,
             }
         }

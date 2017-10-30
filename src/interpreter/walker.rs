@@ -8,28 +8,32 @@ use std::collections::HashMap;
 pub type Memory = HashMap<Ident, Expr>;
 
 impl Expr {
-    fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
+    pub fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
         match self.node {
-            Node::Ident(ref id) => {
-                memory
-                    .get(id)
-                    .ok_or_else(|| {
-                        self.debug.to_string() + ", but " + &id.0 + " has not been defined yet."
-                    })
-                    .map(|val| val.clone())
-            }
+            Node::Ident(ref id) => id.run(&self.debug, memory),
             Node::Return(ref expr) => {
                 let mut res = self.clone();
                 res.node = Node::Return(Box::new(expr.run(memory)?));
                 Ok(res)
             }
-            Node::Op(ref operator) => operator.run(memory),
-            Node::Function(ref function) => function.run(memory, Vec::new()),
+            Node::Op(ref operator) => operator.run(&self.debug, memory),
+            Node::Function(ref function) => function.run(memory, &[]),
             Node::If(ref if_stmt) => if_stmt.run(memory),
             Node::For(ref for_stmt) => for_stmt.run(memory),
             Node::While(ref while_stmt) => while_stmt.run(memory),
             _ => Ok(self.clone()),
         }
+    }
+}
+
+impl Ident {
+    fn run(&self, debug: &DebugInfo, memory: &mut Memory) -> Result<Expr, String> {
+        memory
+            .get(self)
+            .ok_or_else(|| {
+                debug.to_string() + ", but " + &self.0 + " has not been defined yet."
+            })
+            .map(|val| val.clone())
     }
 }
 
@@ -72,7 +76,7 @@ macro_rules! do_binary_op {
 }
 
 impl Operator {
-    fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
+    fn run(&self, debug: &DebugInfo, memory: &mut Memory) -> Result<Expr, String> {
         match *self {
             Operator::Assign(ref id, ref expr) => {
                 let val = expr.run(memory)?;
@@ -80,7 +84,17 @@ impl Operator {
                 Ok(Expr::new(Node::Noop, expr.debug.clone()))
             }
 
-            Operator::Call(ref id, ref args) => unimplemented!(),
+            Operator::Call(ref id, ref args) => {
+                match id.run(debug, memory)?.node {
+                    Node::Function(ref function) => function.run(memory, args),
+                    _ => {
+                        Err(
+                            debug.to_string() +
+                                ", but this is not a function, so you cannot call it as a function",
+                        )?
+                    }
+                }
+            }
 
             Operator::Add(ref left, ref right) => {
                 do_binary_op!(+, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => unimplemented!())
@@ -170,6 +184,13 @@ impl Operator {
     }
 }
 
+fn scope<T, U: FnOnce(&mut Memory) -> T>(memory: &mut Memory, scoped_code: U) -> T {
+    let keys: Vec<_> = memory.keys().cloned().collect();
+    let result = scoped_code(memory);
+    memory.retain(|ident, _| keys.contains(ident));
+    result
+}
+
 /// get the list of visible identifiers at this scope level
 fn get_scope(memory: &mut Memory) -> Vec<Ident> {
     memory.keys().cloned().collect()
@@ -197,29 +218,28 @@ fn run_exprs(exprs: &Vec<Expr>, memory: &mut Memory) -> Result<Expr, String> {
 }
 
 impl Function {
-    fn run(&self, memory: &mut Memory, args: Vec<Expr>) -> Result<Expr, String> {
-        if self.args.len() != args.len() {
-            return Err(format!(
-                "Function {} called with incorrect number of arguments. Expected {} but found {}.",
-                self.name,
-                self.args.len(),
-                args.len()
-            ))?;
-        }
-        let scope = get_scope(memory);
-        for (id, val) in self.args.iter().zip(args) {
-            memory.insert(id.clone(), val);
-        }
-        for mut expr in &self.body {
-            match expr.run(memory)?.node {
-                Node::Return(ret_expr) => return revert_scope_after(Ok(*ret_expr), scope, memory),
-                _ => {}
-            };
-        }
-
-        revert_scope(scope, memory);
-
-        Ok(Expr::new(Node::Noop, DebugInfo::none()))
+    fn run(&self, memory: &mut Memory, args: &[Expr]) -> Result<Expr, String> {
+        scope(memory, |memory| {
+            if self.args.len() != args.len() {
+                return Err(format!(
+                    "Function {} called with incorrect number of arguments. Expected {} but found {}.",
+                    self.name,
+                    self.args.len(),
+                    args.len()
+                ))?;
+            }
+            let scope = get_scope(memory);
+            for (id, val) in self.args.iter().zip(args) {
+                memory.insert(id.clone(), val.clone());
+            }
+            for mut expr in &self.body {
+                match expr.run(memory)?.node {
+                    Node::Return(ret_expr) => return Ok(*ret_expr),
+                    _ => {}
+                };
+            }
+            Ok(Expr::new(Node::Noop, DebugInfo::none()))
+        })
     }
 }
 
@@ -228,26 +248,86 @@ impl If {
         let conditional = self.condition.run(memory)?;
         let conditional = match conditional.node {
             Node::Bool(bool_val) => bool_val,
-            _ => Err("")?,
+            _ => {
+                Err(
+                    conditional.debug.to_string() +
+                        ", but this does not resolve to a boolean value, so it cannot be a conditional.",
+                )?
+            }
         };
 
-        if conditional {
+        scope(memory, |memory| if conditional {
             run_exprs(&self.true_body, memory)
         } else {
             run_exprs(&self.else_body, memory)
-        }
+        })
     }
 }
 
 impl For {
     fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
-        unimplemented!();
+        loop {
+            let val = scope(memory, |memory| self.iterator.run(memory))?;
+            match val.node {
+                Node::Noop => break,
+                _ => {}
+            };
+
+            let res = scope(memory, |memory| {
+                memory.insert(self.loopvar.clone(), val);
+                let result = match run_exprs(&self.body, memory) {
+                    Ok(expr) => expr,
+                    Err(err) => return Some(Err(err)),
+                };
+                match result.node {
+                    Node::Return(_) => Some(Ok(result)),
+                    _ => None,
+                }
+            });
+
+            if let Some(ret_val) = res {
+                return ret_val;
+            }
+        }
+
+        Ok(Expr::new(Node::Noop, DebugInfo::none()))
     }
 }
 
 impl While {
     fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
-        unimplemented!();
+        loop {
+            let conditional = scope(memory, |memory| self.condition.run(memory))?;
+            let conditional = match conditional.node {
+                Node::Bool(bool_val) => bool_val,
+                _ => {
+                    Err(
+                        conditional.debug.to_string() +
+                            ", but this does not resolve to a boolean value, so it cannot be a conditional.",
+                    )?
+                }
+            };
+
+            if !conditional {
+                break;
+            }
+
+            let res = scope(memory, |memory| {
+                let result = match run_exprs(&self.body, memory) {
+                    Ok(expr) => expr,
+                    Err(err) => return Some(Err(err)),
+                };
+                match result.node {
+                    Node::Return(_) => Some(Ok(result)),
+                    _ => None,
+                }
+            });
+
+            if let Some(ret_val) = res {
+                return ret_val;
+            }
+        }
+        Ok(Expr::new(Node::Noop, DebugInfo::none()))
     }
 }
 

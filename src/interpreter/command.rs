@@ -1,7 +1,7 @@
 use std::time::Instant;
-use pancurses;
+use std::collections::HashMap;
 
-use interpreter::builtins::*;
+use interpreter::ast::*;
 
 // Obviously just a rough sketch
 // These fields will need to be rethought
@@ -16,19 +16,19 @@ pub struct ExpressionOutput {
 }
 
 pub fn run_expression(buffer: &str) -> Result<ExpressionOutput, String> {
-    let mut words = buffer.split(' ');
-    let command = words.next();
-    let args = words.collect();
 
-    command
-        .and_then(|command| match command {
-            "echo" => Some(echo(buffer, args)),
-            "cat" => Some(cat(buffer, args)),
-            "exit" => {
-                pancurses::endwin();
-                ::std::process::exit(0);
-            }
-            _ => None,
-        })
-        .unwrap_or_else(|| Err(format!("could not find {}", buffer)))
+    let expr = Expr::parse(buffer)?;
+    let memory = &mut HashMap::new();
+    let result = expr.run(memory).unwrap();
+
+    let output = format!("result: {:?}", result);
+
+    Ok(ExpressionOutput {
+        command: buffer.to_string(),
+        stdout: output.clone(),
+        stderr: "".to_string(),
+        interleaved: output,
+        started: Instant::now(),
+        completed: Instant::now(),
+    })
 }
