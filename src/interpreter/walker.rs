@@ -187,9 +187,10 @@ fn revert_scope_after<T>(val: T, scope: Vec<Ident>, memory: &mut Memory) -> T {
 
 fn run_exprs(exprs: &Vec<Expr>, memory: &mut Memory) -> Result<Expr, String> {
     for mut expr in exprs {
+        let expr = expr.run(memory)?;
         match expr.node {
-            Node::Return(_) => expr.run(memory)?,
-            _ => expr.run(memory)?,
+            Node::Return(_) => return Ok(expr),
+            _ => {}
         };
     }
     Ok(Expr::new(Node::Noop, DebugInfo::none()))
