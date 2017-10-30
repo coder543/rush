@@ -1,6 +1,7 @@
 - aggressive autocomplete
 - better scripting syntax
 	- scripts should have a lightweight concept of modules, to be able to import and reuse script logic
+- first class argument parsing
 - who even needs tmux
 - implement a TUI scrollbar for the output buffer that can be dragged with a mouse
 - add action boxes, like one for each command's output to save that output to a file, and one for the whole buffer

@@ -89,6 +89,7 @@ impl Expr {
         Expr { node, debug }
     }
 
+    // this should really return Result<AST, String>
     pub fn parse(buffer: &str) -> Result<Expr, String> {
         let ast = AST::new();
         let tokenizer = &mut RushTokenizer::new(buffer).peekable();
@@ -111,6 +112,11 @@ struct AST {
 impl AST {
     fn new() -> AST {
         AST { memory: HashMap::new() }
+    }
+
+    /// calls the anonymous outer function that surrounds the result of Expr::parse
+    pub fn run(&self) -> Result<Node, String> {
+        Err("Not implemented yet")?
     }
 }
 
