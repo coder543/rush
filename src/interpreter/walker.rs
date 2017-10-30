@@ -210,9 +210,8 @@ impl Function {
             memory.insert(id.clone(), val);
         }
         for mut expr in &self.body {
-            let expr = expr.run(memory)?;
-            match expr.node {
-                Node::Return(_) => return revert_scope_after(Ok(expr), scope, memory),
+            match expr.run(memory)?.node {
+                Node::Return(ret_expr) => return revert_scope_after(Ok(*ret_expr), scope, memory),
                 _ => {}
             };
         }
