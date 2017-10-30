@@ -48,6 +48,7 @@ macro_rules! resolve {
             Node::Float(_) => $exp,
             Node::Str(_) => $exp,
             Node::Bool(_) => $exp,
+            Node::Array(_) => $exp,
             _ => {$store = $exp.run($memory)?; &$store}
         }
     )
@@ -90,18 +91,104 @@ impl Operator {
                 }
             }
 
-            Operator::Command(ref cmd, ref args) => {
-                unimplemented!()
-            }
+            Operator::Command(ref cmd, ref args) => unimplemented!(),
 
             Operator::ArrayAccess(ref arr, ref idx) => {
-                unimplemented!()
+                let store1;
+                let store2;
+                let arr = resolve!(arr, memory, store1);
+                let idx = resolve!(idx, memory, store2);
+                let idx = match idx.node {
+                    Node::Int(index) => index,
+                    _ => {
+                        Err(
+                            debug.to_string() +
+                                ", but this is not an Int, so it cannot be used to index an array",
+                        )?
+                    }
+                };
+                if idx < 0 {
+                    Err(
+                        debug.to_string() +
+                            ", but the value is negative, and array indices cannot be negative",
+                    )?
+                }
+                use std::usize;
+                if idx as u64 > usize::MAX as u64 {
+                    Err(
+                        debug.to_string() + ", but the value is greater than " +
+                            &usize::MAX.to_string() +
+                            ", which is not allowed for array indices on this platform",
+                    )?
+                }
+                let idx = idx as usize;
+                match arr.node {
+                    Node::Array(ref arr) => Ok(
+                        arr.get(idx)
+                            .ok_or(
+                                debug.to_string() + ", but this index does not exist in the array",
+                            )?
+                            .clone(),
+                    ),
+                    _ => {
+                        Err(
+                            debug.to_string() +
+                                ", but this is not an array, so you cannot index this variable like an array",
+                        )?
+                    }
+                }
             }
 
             Operator::Assign(ref id, ref opt_idx, ref expr) => {
-                let store;
-                let val = resolve!(expr, memory, store);
-                memory.insert(id.clone(), val.clone());
+                let store1;
+                let store2;
+                let val = resolve!(expr, memory, store1);
+                if let &Some(ref idx) = opt_idx {
+                    let idx = resolve!(idx, memory, store2);
+                    let idx = match idx.node {
+                        Node::Int(index) => index,
+                        _ => {
+                            Err(
+                                debug.to_string() +
+                                    ", but this is not an Int, so it cannot be used to index an array",
+                            )?
+                        }
+                    };
+                    if idx < 0 {
+                        Err(
+                            debug.to_string() +
+                                ", but the value is negative, and array indices cannot be negative",
+                        )?
+                    }
+                    use std::usize;
+                    if idx as u64 > usize::MAX as u64 {
+                        Err(
+                            debug.to_string() + ", but the value is greater than " +
+                                &usize::MAX.to_string() +
+                                ", which is not allowed for array indices on this platform",
+                        )?
+                    }
+                    let idx = idx as usize;
+                    let arr = memory.get_mut(id).ok_or_else(|| {
+                        debug.to_string() + ", but " + &id.0 + " has not been defined yet."
+                    })?;
+                    match arr.node {
+                        Node::Array(ref mut arr) => {
+                            *(arr.get_mut(idx).ok_or(
+                                debug.to_string() +
+                                    ", but this index does not exist in the array",
+                            )?) = val.clone()
+                        }
+                        _ => {
+                            Err(
+                                debug.to_string() +
+                                    ", but this is not an array, so you cannot index this variable like an array",
+                            )?
+                        }
+                    }
+                } else {
+                    memory.insert(id.clone(), val.clone());
+                }
                 Ok(Expr::new(Node::Noop, expr.debug.clone()))
             }
 

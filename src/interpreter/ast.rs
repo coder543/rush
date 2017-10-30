@@ -356,11 +356,18 @@ fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, 
     loop {
         let expr = parse_expr(tokenizer, false)?;
         args.push(expr);
-        match tokenizer.next().ok_or(debug.to_string() +
-                            ", reached end of input while trying to parse function call")? {
+        match tokenizer.next().ok_or(
+            debug.to_string() +
+                ", reached end of input while trying to parse function call",
+        )? {
             Token::Operator(ref op, _) if op == "," => {}
             Token::Operator(ref op, _) if op == ")" => break,
-            token => Err(debug.to_string() + ", while parsing function call, " + &token.get_debug_info().to_string())?
+            token => {
+                Err(
+                    debug.to_string() + ", while parsing function call, " +
+                        &token.get_debug_info().to_string(),
+                )?
+            }
         }
     }
 
@@ -392,11 +399,18 @@ fn parse_cmd(cmd: String, tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result
     loop {
         let expr = parse_expr(tokenizer, false)?;
         args.push(expr);
-        match tokenizer.next().ok_or(debug.to_string() +
-                            ", reached end of input while trying to parse command expression")? {
+        match tokenizer.next().ok_or(
+            debug.to_string() +
+                ", reached end of input while trying to parse command expression",
+        )? {
             Token::Operator(ref op, _) if op == "," => {}
             Token::Operator(ref op, _) if op == ")" => break,
-            token => Err(debug.to_string() + ", while parsing command expression, " + &token.get_debug_info().to_string())?
+            token => {
+                Err(
+                    debug.to_string() + ", while parsing command expression, " +
+                        &token.get_debug_info().to_string(),
+                )?
+            }
         }
     }
 
@@ -430,10 +444,12 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
         Token::Operator(op, debug) => {
             if op == ";" {
                 Expr::new(Node::Noop, debug)
-            } else if op != "(" {
-                parse_unary_operator(&op, debug, tokenizer)?
-            } else {
+            } else if op == "(" {
                 parse_parenthetic_expr(&op, &debug, tokenizer)?
+            } else if op == "[" {
+                parse_arr(&op, debug, tokenizer)?
+            } else {
+                parse_unary_operator(&op, debug, tokenizer)?
             }
         }
         Token::Unknown(unknown, debug) => {
@@ -663,6 +679,48 @@ fn parse_binary_operator(
     }
 }
 
+fn parse_arr(
+    op: &str,
+    debug: DebugInfo,
+    tokenizer: &mut Tokenizer,
+) -> Result<Expr, String> {
+    if op != "[" {
+        panic!("bad parse_arr");
+    }
+
+    let mut vals = Vec::new();
+
+    loop {
+        let expr = parse_expr(tokenizer, false)?;
+        vals.push(expr);
+        match tokenizer.next().ok_or(
+            debug.to_string() +
+                ", reached end of input while trying to parse array literal",
+        )? {
+            Token::Operator(ref op, _) if op == "," => {}
+            Token::Operator(ref op, _) if op == "]" => break,
+            token => {
+                Err(
+                    debug.to_string() + ", while parsing array literal, " +
+                        &token.get_debug_info().to_string(),
+                )?
+            }
+        }
+    }
+
+    tokenizer
+        .next()
+        .ok_or(
+            debug.to_string() + ", reached end of input while trying to parse array literal",
+        )?
+        .expect_operator_specific("]")?;
+
+    Ok(Expr::new(
+        Node::Array(vals),
+        debug,
+    ))
+}
+
 fn parse_parenthetic_expr(
     op: &str,
     debug: &DebugInfo,
@@ -713,8 +771,9 @@ fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
     let fake_semicolon = Token::Operator(";".to_string(), DebugInfo::new(";".to_string(), 0));
 
     let op = match tokenizer.peek().unwrap_or_else(|| &fake_semicolon) {
-        &Token::Operator(ref op, _)
-            if op == ";" || op == ")" || op == "{" || op == "}" => op.clone(),
+        &Token::Operator(ref op, _) if op == ";" || op == ")" || op == "{" || op == "}" => {
+            op.clone()
+        }
         token => return token.expect_operator_specific(";"),
     };
     // use up the semicolon if it is there
