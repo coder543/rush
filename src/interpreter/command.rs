@@ -2,7 +2,7 @@ use std::time::Instant;
 use std::collections::HashMap;
 
 use interpreter::ast::*;
-use interpreter::tokenizer::{Ident, DebugInfo};
+use interpreter::tokenizer::Ident;
 
 // Obviously just a rough sketch
 // These fields will need to be rethought
@@ -28,7 +28,7 @@ pub fn run_expression(
         memory.insert(Ident(format!("$arg{}", i)), Expr::parse_one(&arg)?);
     }
 
-    let result = expr.run(memory).unwrap();
+    let result = expr.run(memory)?;
 
     let output = format!("{:?}", result.node);
 

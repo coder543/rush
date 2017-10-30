@@ -211,7 +211,12 @@ impl<'a> RushTokenizer<'a> {
         if let Some(ready_token) = self.ready_tokens.pop_front() {
             raw_token = ready_token;
         } else {
-            raw_token = try_opt!(self.token_stream.next()).to_string();
+            raw_token = loop {
+                let tmp = try_opt!(self.token_stream.next()).to_string();
+                if tmp.len() > 0 {
+                    break tmp;
+                }
+            }
         }
         self.last_len = raw_token.len() as u64 + 1; // + 1 to account for the space
 
