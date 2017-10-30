@@ -157,7 +157,7 @@ impl Token {
     }
 }
 
-static SYM_OPS: [&str; 20] = [
+static SYM_OPS: [&str; 22] = [
     ">=",
     "<=",
     "==",
@@ -172,6 +172,8 @@ static SYM_OPS: [&str; 20] = [
     "=",
     "!",
     ";",
+    "[",
+    "]",
     "(",
     ")",
     "{",

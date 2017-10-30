@@ -78,12 +78,6 @@ macro_rules! do_binary_op {
 impl Operator {
     fn run(&self, debug: &DebugInfo, memory: &mut Memory) -> Result<Expr, String> {
         match *self {
-            Operator::Assign(ref id, ref expr) => {
-                let val = expr.run(memory)?;
-                memory.insert(id.clone(), val);
-                Ok(Expr::new(Node::Noop, expr.debug.clone()))
-            }
-
             Operator::Call(ref id, ref args) => {
                 match id.run(debug, memory)?.node {
                     Node::Function(ref function) => function.run(memory, args),
@@ -98,6 +92,17 @@ impl Operator {
 
             Operator::Command(ref cmd, ref args) => {
                 unimplemented!()
+            }
+
+            Operator::ArrayAccess(ref arr, ref idx) => {
+                unimplemented!()
+            }
+
+            Operator::Assign(ref id, ref opt_idx, ref expr) => {
+                let store;
+                let val = resolve!(expr, memory, store);
+                memory.insert(id.clone(), val.clone());
+                Ok(Expr::new(Node::Noop, expr.debug.clone()))
             }
 
             Operator::Add(ref left, ref right) => {

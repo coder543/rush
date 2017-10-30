@@ -12,6 +12,7 @@ pub enum Node {
     Int(i64),
     Float(f64),
     Str(String),
+    Array(Vec<Expr>),
     Return(Box<Expr>),
     Op(Box<Operator>),
     If(Box<If>),
@@ -24,7 +25,8 @@ pub enum Node {
 pub enum Operator {
     Call(Ident, Vec<Expr>),
     Command(String, Vec<Expr>),
-    Assign(Ident, Expr),
+    ArrayAccess(Expr, Expr),
+    Assign(Ident, Option<Expr>, Expr),
     Add(Expr, Expr),
     Sub(Expr, Expr),
     Mul(Expr, Expr),
@@ -563,7 +565,7 @@ fn operator_expr_from(
             ">=" => Operator::GreaterOrEquals(first_expr, next_expr),
             "=" => {
                 match first_expr.node {
-                    Node::Ident(id) => Operator::Assign(id, next_expr),
+                    Node::Ident(id) => Operator::Assign(id, None, next_expr),
                     _ => {
                         Err(
                             first_expr.debug.to_string() +
@@ -763,6 +765,7 @@ mod tests {
                         Expr {
                             node: Node::Op(Box::new(Operator::Assign(
                                 Ident("$someInt".to_string()),
+                                None,
                                 Expr {
                                     node: Node::Ident(Ident("$otherInt".to_string())),
                                     debug: DebugInfo::new("$otherInt", 11),
@@ -795,6 +798,7 @@ mod tests {
                                     Expr {
                                         node: Node::Op(Box::new(Operator::Assign(
                                             Ident("$someInt".to_string()),
+                                            None,
                                             Expr {
                                                 node: Node::Ident(Ident("$otherInt".to_string())),
                                                 debug: DebugInfo::new("$otherInt", 33),
@@ -838,6 +842,7 @@ mod tests {
                                         debug: DebugInfo::new("=", 35),
                                         node: Node::Op(Box::new(Operator::Assign(
                                             Ident("$someInt".to_string()),
+                                            None,
                                             Expr {
                                                 debug: DebugInfo::new("$otherInt", 37),
                                                 node: Node::Ident(Ident("$otherInt".to_string())),
@@ -886,6 +891,7 @@ mod tests {
                                         debug: DebugInfo::new("=", 42),
                                         node: Node::Op(Box::new(Operator::Assign(
                                             Ident("$otherInt".to_string()),
+                                            None,
                                             Expr {
                                                 debug: DebugInfo::new("$someInt", 44),
                                                 node: Node::Ident(Ident("$someInt".to_string())),
@@ -939,6 +945,7 @@ mod tests {
                                         debug: DebugInfo::new("=", 29),
                                         node: Node::Op(Box::new(Operator::Assign(
                                             Ident("$someInt".to_string()),
+                                            None,
                                             Expr {
                                                 debug: DebugInfo::new("$otherInt", 31),
                                                 node: Node::Ident(Ident("$otherInt".to_string())),
@@ -951,6 +958,7 @@ mod tests {
                                         debug: DebugInfo::new("=", 59),
                                         node: Node::Op(Box::new(Operator::Assign(
                                             Ident("$someInt".to_string()),
+                                            None,
                                             Expr {
                                                 node: Node::Int(3),
                                                 debug: DebugInfo::new("3", 61),
