@@ -12,6 +12,8 @@ use interactive::input_loop;
 
 mod interpreter;
 
+pub mod script;
+
 pub fn start_interactive() {
     let screen = &pancurses::initscr();
     pancurses::noecho();

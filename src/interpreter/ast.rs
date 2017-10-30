@@ -133,6 +133,7 @@ fn parse_exprs(tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, 
     loop {
         let consume;
         if let Some(token) = tokenizer.peek() {
+            #[cfg(test)]
             println!("parse_exprs: found token {:?}", token);
             if !outermost && token.expect_operator_specific("}").is_ok() {
                 consume = true;
@@ -198,6 +199,7 @@ fn parse_for(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String
 }
 
 fn parse_if(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
+    #[cfg(test)]
     println!("parse_if");
     let condition = parse_expr(tokenizer)?;
 

@@ -276,6 +276,7 @@ impl<'a> RushTokenizer<'a> {
     }
 
     fn subdivide_token(&mut self, raw_token: &mut String) {
+        #[cfg(test)]
         println!("token to subdivide is {}", raw_token);
         if raw_token.len() == 1 {
             return;

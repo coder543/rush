@@ -21,7 +21,7 @@ pub fn run_expression(buffer: &str) -> Result<ExpressionOutput, String> {
     let memory = &mut HashMap::new();
     let result = expr.run(memory).unwrap();
 
-    let output = format!("result: {:?}", result);
+    let output = format!("{:?}", result.node);
 
     Ok(ExpressionOutput {
         command: buffer.to_string(),
