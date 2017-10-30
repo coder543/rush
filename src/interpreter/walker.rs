@@ -18,8 +18,16 @@ impl Expr {
                     })
                     .map(|val| val.clone())
             }
+            Node::Return(ref expr) => {
+                let mut res = self.clone();
+                res.node = Node::Return(Box::new(expr.run(memory)?));
+                Ok(res)
+            }
             Node::Op(ref operator) => operator.run(memory),
             Node::Function(ref function) => function.run(memory, Vec::new()),
+            Node::If(ref if_stmt) => if_stmt.run(memory),
+            Node::For(ref for_stmt) => for_stmt.run(memory),
+            Node::While(ref while_stmt) => while_stmt.run(memory),
             _ => Ok(self.clone()),
         }
     }
@@ -177,6 +185,16 @@ fn revert_scope_after<T>(val: T, scope: Vec<Ident>, memory: &mut Memory) -> T {
     val
 }
 
+fn run_exprs(exprs: &Vec<Expr>, memory: &mut Memory) -> Result<Expr, String> {
+    for mut expr in exprs {
+        match expr.node {
+            Node::Return(_) => expr.run(memory)?,
+            _ => expr.run(memory)?,
+        };
+    }
+    Ok(Expr::new(Node::Noop, DebugInfo::none()))
+}
+
 impl Function {
     fn run(&self, memory: &mut Memory, args: Vec<Expr>) -> Result<Expr, String> {
         if self.args.len() != args.len() {
@@ -192,15 +210,44 @@ impl Function {
             memory.insert(id.clone(), val);
         }
         for mut expr in &self.body {
+            let expr = expr.run(memory)?;
             match expr.node {
-                Node::Return(_) => return revert_scope_after(expr.run(memory), scope, memory),
-                _ => expr.run(memory)?,
+                Node::Return(_) => return revert_scope_after(Ok(expr), scope, memory),
+                _ => {}
             };
         }
 
         revert_scope(scope, memory);
 
         Ok(Expr::new(Node::Noop, DebugInfo::none()))
+    }
+}
+
+impl If {
+    fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
+        let conditional = self.condition.run(memory)?;
+        let conditional = match conditional.node {
+            Node::Bool(bool_val) => bool_val,
+            _ => Err("")?,
+        };
+
+        if conditional {
+            run_exprs(&self.true_body, memory)
+        } else {
+            run_exprs(&self.else_body, memory)
+        }
+    }
+}
+
+impl For {
+    fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
+        unimplemented!();
+    }
+}
+
+impl While {
+    fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
+        unimplemented!();
     }
 }
 
