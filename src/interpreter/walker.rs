@@ -96,6 +96,10 @@ impl Operator {
                 }
             }
 
+            Operator::Command(ref cmd, ref args) => {
+                unimplemented!()
+            }
+
             Operator::Add(ref left, ref right) => {
                 do_binary_op!(+, memory, left, right, (Int, Int -> (Int:i64)), (Float, Float -> (Float:f64)), (Float, Int -> (Float:f64)), (Int, Float -> (Float:f64));; _ => Err(left.debug.to_string() + ", " + &right.debug.to_string() + ", but these cannot be added.")?)
             }

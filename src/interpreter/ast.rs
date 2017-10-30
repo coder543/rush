@@ -23,6 +23,7 @@ pub enum Node {
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Operator {
     Call(Ident, Vec<Expr>),
+    Command(String, Vec<Expr>),
     Assign(Ident, Expr),
     Add(Expr, Expr),
     Sub(Expr, Expr),
@@ -106,7 +107,7 @@ impl Expr {
 
     pub fn parse_one(buffer: &str) -> Result<Expr, String> {
         let tokenizer = &mut RushTokenizer::new(buffer).peekable();
-        parse_expr(tokenizer)
+        parse_expr(tokenizer, true)
     }
 }
 
@@ -152,7 +153,7 @@ fn parse_exprs(tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, 
             tokenizer.next();
             return Ok(exprs);
         }
-        exprs.push(parse_expr(tokenizer)?)
+        exprs.push(parse_expr(tokenizer, true)?)
     }
 
     if outermost {
@@ -163,7 +164,7 @@ fn parse_exprs(tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, 
 }
 
 fn parse_while(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
-    let condition = parse_expr(tokenizer)?;
+    let condition = parse_expr(tokenizer, true)?;
 
     let body = parse_exprs(tokenizer, false)?;
 
@@ -188,7 +189,7 @@ fn parse_for(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String
         )?
         .expect_unknown_specific("in")?;
 
-    let iterator = parse_expr(tokenizer)?;
+    let iterator = parse_expr(tokenizer, true)?;
 
     let body = parse_exprs(tokenizer, false)?;
 
@@ -206,7 +207,7 @@ fn parse_for(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String
 fn parse_if(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
     #[cfg(test)]
     println!("parse_if");
-    let condition = parse_expr(tokenizer)?;
+    let condition = parse_expr(tokenizer, true)?;
 
     let true_body = parse_exprs(tokenizer, false)?;
 
@@ -351,25 +352,13 @@ fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, 
     let mut args = Vec::new();
 
     loop {
-        let expr = parse_expr(tokenizer)?;
+        let expr = parse_expr(tokenizer, false)?;
         args.push(expr);
-        let peek =
-            match tokenizer.peek() {
-                Some(token) => token,
-                None => {
-                    Err(
-                        debug.to_string() +
-                            ", reached end of input while trying to parse function call",
-                    )?
-                }
-            };
-        match *peek {
-            Token::Operator(ref op, _) => {
-                if op == ")" {
-                    break;
-                }
-            }
-            _ => {}
+        match tokenizer.next().ok_or(debug.to_string() +
+                            ", reached end of input while trying to parse function call")? {
+            Token::Operator(ref op, _) if op == "," => {}
+            Token::Operator(ref op, _) if op == ")" => break,
+            token => Err(debug.to_string() + ", while parsing function call, " + &token.get_debug_info().to_string())?
         }
     }
 
@@ -386,8 +375,40 @@ fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, 
     ))
 }
 
-fn parse_cmd(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
-    unimplemented!();
+fn parse_cmd(cmd: String, tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
+    let fn_name = cmd;
+
+    tokenizer
+        .next()
+        .ok_or(
+            debug.to_string() + ", reached end of input while trying to parse command expression",
+        )?
+        .expect_operator_specific("(")?;
+
+    let mut args = Vec::new();
+
+    loop {
+        let expr = parse_expr(tokenizer, false)?;
+        args.push(expr);
+        match tokenizer.next().ok_or(debug.to_string() +
+                            ", reached end of input while trying to parse command expression")? {
+            Token::Operator(ref op, _) if op == "," => {}
+            Token::Operator(ref op, _) if op == ")" => break,
+            token => Err(debug.to_string() + ", while parsing command expression, " + &token.get_debug_info().to_string())?
+        }
+    }
+
+    tokenizer
+        .next()
+        .ok_or(
+            debug.to_string() + ", reached end of input while trying to parse command expression",
+        )?
+        .expect_operator_specific(")")?;
+
+    Ok(Expr::new(
+        Node::Op(Box::new(Operator::Command(fn_name, args))),
+        debug,
+    ))
 }
 
 fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
@@ -419,15 +440,15 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
                 "for" => parse_for(tokenizer, debug)?,
                 "if" => parse_if(tokenizer, debug)?,
                 "fn" => parse_fn(tokenizer, debug)?,
-                "return" => Expr::new(Node::Return(Box::new(parse_expr(tokenizer)?)), debug),
-                _ => parse_cmd(tokenizer, debug)?,
+                "return" => Expr::new(Node::Return(Box::new(parse_expr(tokenizer, true)?)), debug),
+                _ => parse_cmd(unknown, tokenizer, debug)?,
             }
         }
         _ => return Err("Unexpected token")?,
     })
 }
 
-fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
+fn parse_expr(tokenizer: &mut Tokenizer, check_for_end: bool) -> Result<Expr, String> {
     let primary_expr = parse_primary(tokenizer)?;
 
     #[cfg(test)]
@@ -455,10 +476,12 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
     }
 
     if fn_call {
-        Ok(parse_fn_call(primary_expr, tokenizer)?)
+        parse_fn_call(primary_expr, tokenizer)
     } else {
         let expr = parse_binary_operator(0, primary_expr, tokenizer)?;
-        check_for_end_of_expr(tokenizer)?;
+        if check_for_end {
+            check_for_end_of_expr(tokenizer)?;
+        }
         Ok(expr)
     }
 }
@@ -484,7 +507,7 @@ fn parse_unary_operator(
             "' must be followed by an expression.",
     )?;
 
-    let next_expr = parse_expr(tokenizer)?;
+    let next_expr = parse_expr(tokenizer, true)?;
 
     let operator = match op.as_ref() {
         "!" => Operator::Not(next_expr),
@@ -660,7 +683,7 @@ fn parse_parenthetic_expr(
             ", then encountered end of input! '(' must be followed by an expression.",
     )?;
 
-    let expr = parse_expr(tokenizer)?;
+    let expr = parse_expr(tokenizer, true)?;
 
     tokenizer
         .next()
@@ -689,7 +712,7 @@ fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
 
     let op = match tokenizer.peek().unwrap_or_else(|| &fake_semicolon) {
         &Token::Operator(ref op, _)
-            if op == ";" || op == ")" || op == "{" || op == "}" || op == "," => op.clone(),
+            if op == ";" || op == ")" || op == "{" || op == "}" => op.clone(),
         token => return token.expect_operator_specific(";"),
     };
     // use up the semicolon if it is there
