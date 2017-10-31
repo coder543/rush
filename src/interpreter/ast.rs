@@ -392,22 +392,34 @@ fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, 
 
     let mut args = Vec::new();
 
-    loop {
-        let expr = parse_expr(tokenizer)?;
-        args.push(expr);
-        match tokenizer.next().ok_or(
-            debug.to_string() +
-                ", reached end of input while trying to parse function call",
-        )? {
-            Token::Operator(ref op, _) if op == "," => {}
-            Token::Operator(ref op, _) if op == ")" => break,
-            token => {
-                Err(
-                    debug.to_string() + ", while parsing function call, " +
-                        &token.get_debug_info().to_string(),
-                )?
+    let has_args = match tokenizer.peek().ok_or(
+        debug.to_string() +
+            ", reached end of input while trying to parse function call",
+    )? {
+        &Token::Operator(ref op, _) if op == ")" => false,
+        _ => true
+    };
+
+    if has_args {
+        loop {
+            let expr = parse_expr(tokenizer)?;
+            args.push(expr);
+            match tokenizer.next().ok_or(
+                debug.to_string() +
+                    ", reached end of input while trying to parse function call",
+            )? {
+                Token::Operator(ref op, _) if op == "," => {}
+                Token::Operator(ref op, _) if op == ")" => break,
+                token => {
+                    Err(
+                        debug.to_string() + ", while parsing function call, " +
+                            &token.get_debug_info().to_string(),
+                    )?
+                }
             }
         }
+    } else {
+        tokenizer.next();
     }
 
     Ok(Expr::new(
