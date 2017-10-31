@@ -99,21 +99,21 @@ impl Operator {
                     Node::Int(index) => index,
                     _ => {
                         Err(
-                            debug.to_string() +
+                            idx_expr.debug.to_string() +
                                 ", but this is not an Int, so it cannot be used to index an array",
                         )?
                     }
                 };
                 if idx < 0 {
                     Err(
-                        debug.to_string() +
+                        idx_expr.debug.to_string() +
                             ", but the value is negative, and array indices cannot be negative",
                     )?
                 }
                 use std::usize;
                 if idx as u64 > usize::MAX as u64 {
                     Err(
-                        debug.to_string() + ", but the value is greater than " +
+                        idx_expr.debug.to_string() + ", but the value is greater than " +
                             &usize::MAX.to_string() +
                             ", which is not allowed for array indices on this platform",
                     )?
@@ -129,7 +129,7 @@ impl Operator {
                     ),
                     _ => {
                         Err(
-                            idx_expr.debug.to_string() +
+                            arr.debug.to_string() +
                                 ", but this is not an array, so you cannot index this variable like an array",
                         )?
                     }
