@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use interpreter::command::ExpressionOutput;
 use std::time::Instant;
 use std::fs::File;

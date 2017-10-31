@@ -109,7 +109,7 @@ impl Expr {
 
     pub fn parse_one(buffer: &str) -> Result<Expr, String> {
         let tokenizer = &mut RushTokenizer::new(buffer).peekable();
-        parse_expr(tokenizer, true)
+        parse_expr(tokenizer)
     }
 }
 
@@ -155,7 +155,7 @@ fn parse_exprs(tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, 
             tokenizer.next();
             return Ok(exprs);
         }
-        exprs.push(parse_expr(tokenizer, true)?)
+        exprs.push(parse_expr(tokenizer)?)
     }
 
     if outermost {
@@ -166,7 +166,7 @@ fn parse_exprs(tokenizer: &mut Tokenizer, outermost: bool) -> Result<Vec<Expr>, 
 }
 
 fn parse_while(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
-    let condition = parse_expr(tokenizer, true)?;
+    let condition = parse_expr(tokenizer)?;
 
     let body = parse_exprs(tokenizer, false)?;
 
@@ -191,7 +191,7 @@ fn parse_for(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String
         )?
         .expect_unknown_specific("in")?;
 
-    let iterator = parse_expr(tokenizer, true)?;
+    let iterator = parse_expr(tokenizer)?;
 
     let body = parse_exprs(tokenizer, false)?;
 
@@ -209,7 +209,7 @@ fn parse_for(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String
 fn parse_if(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
     #[cfg(test)]
     println!("parse_if");
-    let condition = parse_expr(tokenizer, true)?;
+    let condition = parse_expr(tokenizer)?;
 
     let true_body = parse_exprs(tokenizer, false)?;
 
@@ -354,7 +354,7 @@ fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, 
     let mut args = Vec::new();
 
     loop {
-        let expr = parse_expr(tokenizer, false)?;
+        let expr = parse_expr(tokenizer)?;
         args.push(expr);
         match tokenizer.next().ok_or(
             debug.to_string() +
@@ -397,7 +397,7 @@ fn parse_cmd(cmd: String, tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result
     let mut args = Vec::new();
 
     loop {
-        let expr = parse_expr(tokenizer, false)?;
+        let expr = parse_expr(tokenizer)?;
         args.push(expr);
         match tokenizer.next().ok_or(
             debug.to_string() +
@@ -458,7 +458,7 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
                 "for" => parse_for(tokenizer, debug)?,
                 "if" => parse_if(tokenizer, debug)?,
                 "fn" => parse_fn(tokenizer, debug)?,
-                "return" => Expr::new(Node::Return(Box::new(parse_expr(tokenizer, true)?)), debug),
+                "return" => Expr::new(Node::Return(Box::new(parse_expr(tokenizer)?)), debug),
                 _ => parse_cmd(unknown, tokenizer, debug)?,
             }
         }
@@ -466,7 +466,7 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
     })
 }
 
-fn parse_expr(tokenizer: &mut Tokenizer, check_for_end: bool) -> Result<Expr, String> {
+fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
     let primary_expr = parse_primary(tokenizer)?;
 
     #[cfg(test)]
@@ -481,7 +481,9 @@ fn parse_expr(tokenizer: &mut Tokenizer, check_for_end: bool) -> Result<Expr, St
         };
         match *peek {
             Token::Operator(ref op, _) => {
-                if op == ")" || op == "!" || op == ";" || op == "{" || op == "}" {
+                if op == ")" || op == "!" || op == ";" || op == "{" || op == "}" || op == "," ||
+                    op == "]"
+                {
                     return Ok(primary_expr);
                 } else if op == "(" {
                     fn_call = true;
@@ -497,9 +499,7 @@ fn parse_expr(tokenizer: &mut Tokenizer, check_for_end: bool) -> Result<Expr, St
         parse_fn_call(primary_expr, tokenizer)
     } else {
         let expr = parse_binary_operator(0, primary_expr, tokenizer)?;
-        if check_for_end {
-            check_for_end_of_expr(tokenizer)?;
-        }
+        check_for_end_of_expr(tokenizer)?;
         Ok(expr)
     }
 }
@@ -525,7 +525,7 @@ fn parse_unary_operator(
             "' must be followed by an expression.",
     )?;
 
-    let next_expr = parse_expr(tokenizer, true)?;
+    let next_expr = parse_expr(tokenizer)?;
 
     let operator = match op.as_ref() {
         "!" => Operator::Not(next_expr),
@@ -540,7 +540,6 @@ fn parse_unary_operator(
 
     let expr = Expr::new(Node::Op(Box::new(operator)), debug);
 
-
     Ok(expr)
 }
 
@@ -551,6 +550,7 @@ fn op_precendence(op: &str) -> i32 {
         "-" => 30,
         "*" => 40,
         "/" | "%" => 50,
+        "[" => 1,
         "||" => 5,
         "==" | "!=" | "&&" => 10,
         "<" | ">" | "<=" | ">=" => 15,
@@ -563,6 +563,7 @@ fn operator_expr_from(
     debug: &DebugInfo,
     first_expr: Expr,
     next_expr: Expr,
+    tokenizer: &mut Tokenizer,
 ) -> Result<Expr, String> {
     Ok(Expr::new(
         Node::Op(Box::new(match op {
@@ -582,12 +583,44 @@ fn operator_expr_from(
             "=" => {
                 match first_expr.node {
                     Node::Ident(id) => Operator::Assign(id, None, next_expr),
+                    Node::Op(ref operator) => match operator.as_ref() {
+                        &Operator::ArrayAccess(ref arr, ref idx) => match arr.node {
+                            Node::Ident(ref arr_id) =>  Operator::Assign(arr_id.clone(), Some(idx.clone()), next_expr),
+                            _ => unimplemented!(),
+                        }
+                        _ => unimplemented!(),
+                    },
                     _ => {
                         Err(
                             first_expr.debug.to_string() +
-                                "; left-hand side of assignment must be an identifier.",
+                                "; left-hand side of assignment must be an identifier or array slot.",
                         )?
                     }
+                }
+            }
+            "[" => {
+                tokenizer
+                    .next()
+                    .ok_or(
+                        debug.to_string() +
+                            ", encountered end of input while parsing array access operator",
+                    )?
+                    .expect_operator_specific("]")?;
+                let assignment = match tokenizer
+                    .peek()
+                    .ok_or(
+                        debug.to_string() +
+                            ", encountered end of input while parsing array access operator",
+                    )? {
+                        &Token::Operator(ref op, _) if op == "=" => true,
+                        _ => false,
+                    };
+                let res = Operator::ArrayAccess(first_expr, next_expr);
+                if assignment {
+                    let res = Expr::new(Node::Op(Box::new(res)), debug.clone());
+                    return parse_binary_operator(op_precendence("["), res, tokenizer);
+                } else {
+                    res
                 }
             }
             _ => {
@@ -645,7 +678,13 @@ fn parse_binary_operator(
     let next_expr = parse_primary(tokenizer)?;
 
     if precendence < last_precedence {
-        return Ok(operator_expr_from(&op, &debug, first_expr, next_expr)?);
+        return Ok(operator_expr_from(
+            &op,
+            &debug,
+            first_expr,
+            next_expr,
+            tokenizer,
+        )?);
     }
 
     let mut next_precendence = {
@@ -670,7 +709,7 @@ fn parse_binary_operator(
         next_expr
     };
 
-    let expr = operator_expr_from(&op, &debug, first_expr, next_expr)?;
+    let expr = operator_expr_from(&op, &debug, first_expr, next_expr, tokenizer)?;
 
     if next_precendence != -1 {
         parse_binary_operator(precendence, expr, tokenizer)
@@ -679,11 +718,7 @@ fn parse_binary_operator(
     }
 }
 
-fn parse_arr(
-    op: &str,
-    debug: DebugInfo,
-    tokenizer: &mut Tokenizer,
-) -> Result<Expr, String> {
+fn parse_arr(op: &str, debug: DebugInfo, tokenizer: &mut Tokenizer) -> Result<Expr, String> {
     if op != "[" {
         panic!("bad parse_arr");
     }
@@ -691,7 +726,7 @@ fn parse_arr(
     let mut vals = Vec::new();
 
     loop {
-        let expr = parse_expr(tokenizer, false)?;
+        let expr = parse_expr(tokenizer)?;
         vals.push(expr);
         match tokenizer.next().ok_or(
             debug.to_string() +
@@ -708,17 +743,7 @@ fn parse_arr(
         }
     }
 
-    tokenizer
-        .next()
-        .ok_or(
-            debug.to_string() + ", reached end of input while trying to parse array literal",
-        )?
-        .expect_operator_specific("]")?;
-
-    Ok(Expr::new(
-        Node::Array(vals),
-        debug,
-    ))
+    Ok(Expr::new(Node::Array(vals), debug))
 }
 
 fn parse_parenthetic_expr(
@@ -743,7 +768,7 @@ fn parse_parenthetic_expr(
             ", then encountered end of input! '(' must be followed by an expression.",
     )?;
 
-    let expr = parse_expr(tokenizer, true)?;
+    let expr = parse_expr(tokenizer)?;
 
     tokenizer
         .next()
@@ -771,9 +796,8 @@ fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
     let fake_semicolon = Token::Operator(";".to_string(), DebugInfo::new(";".to_string(), 0));
 
     let op = match tokenizer.peek().unwrap_or_else(|| &fake_semicolon) {
-        &Token::Operator(ref op, _) if op == ";" || op == ")" || op == "{" || op == "}" => {
-            op.clone()
-        }
+        &Token::Operator(ref op, _)
+            if op == ";" || op == ")" || op == "{" || op == "}" || op == "]" => op.clone(),
         token => return token.expect_operator_specific(";"),
     };
     // use up the semicolon if it is there
@@ -835,6 +859,94 @@ mod tests {
                     ],
                 ))),
                 debug: DebugInfo::new("$someInt = $otherInt", 0),
+            })
+        );
+    }
+
+    #[test]
+    fn parse_array_assign() {
+        let expr = Expr::parse("$someInt[3] = $otherInt");
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            node: Node::Op(Box::new(Operator::Assign(
+                                Ident("$someInt".to_string()),
+                                Some(Expr {
+                                    node: Node::Int(3),
+                                    debug: DebugInfo::new("3", 9),
+                                }),
+                                Expr {
+                                    node: Node::Ident(Ident("$otherInt".to_string())),
+                                    debug: DebugInfo::new("$otherInt", 11),
+                                },
+                            ))),
+                            debug: DebugInfo::new("=", 9),
+                        },
+                    ],
+                ))),
+                debug: DebugInfo::new("$someInt = $otherInt", 0),
+            })
+        );
+    }
+
+    #[test]
+    fn parse_array() {
+        let expr = Expr::parse("$x = [3, 2, 4]; return $x[0];");
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            node: Node::Op(Box::new(Operator::Assign(
+                                Ident("$x".to_string()),
+                                None,
+                                Expr {
+                                    node: Node::Array(vec![
+                                        Expr {
+                                            node: Node::Int(3),
+                                            debug: DebugInfo::new("3", 6),
+                                        },
+                                        Expr {
+                                            node: Node::Int(2),
+                                            debug: DebugInfo::new("2", 9),
+                                        },
+                                        Expr {
+                                            node: Node::Int(4),
+                                            debug: DebugInfo::new("4", 12),
+                                        },
+                                    ]),
+                                    debug: DebugInfo::new("[", 5),
+                                },
+                            ))),
+                            debug: DebugInfo::new("=", 3),
+                        },
+                        Expr {
+                            node: Node::Return(Box::new(Expr {
+                                node: Node::Op(Box::new(Operator::ArrayAccess(
+                                    Expr {
+                                        node: Node::Ident(Ident("$x".to_string())),
+                                        debug: DebugInfo::new("$x", 23),
+                                    },
+                                    Expr {
+                                        node: Node::Int(0),
+                                        debug: DebugInfo::new("0", 26),
+                                    },
+                                ))),
+                                debug: DebugInfo::new("[", 25),
+                            })),
+                            debug: DebugInfo::new("return", 16),
+                        },
+                    ],
+                ))),
+                debug: DebugInfo::new("$x = [3, 2, 4]; return $x[0];", 0),
             })
         );
     }
