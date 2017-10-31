@@ -129,7 +129,7 @@ impl Operator {
                     ),
                     _ => {
                         Err(
-                            debug.to_string() +
+                            idx_expr.debug.to_string() +
                                 ", but this is not an array, so you cannot index this variable like an array",
                         )?
                     }
