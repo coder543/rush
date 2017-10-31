@@ -882,14 +882,14 @@ mod tests {
                                 }),
                                 Expr {
                                     node: Node::Ident(Ident("$otherInt".to_string())),
-                                    debug: DebugInfo::new("$otherInt", 11),
+                                    debug: DebugInfo::new("$otherInt", 14),
                                 },
                             ))),
-                            debug: DebugInfo::new("=", 9),
+                            debug: DebugInfo::new("=", 12),
                         },
                     ],
                 ))),
-                debug: DebugInfo::new("$someInt = $otherInt", 0),
+                debug: DebugInfo::new("$someInt[3] = $otherInt", 0),
             })
         );
     }
