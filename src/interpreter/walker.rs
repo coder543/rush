@@ -94,7 +94,7 @@ impl Operator {
                 let store1;
                 let store2;
                 let arr = resolve!(arr, memory, store1);
-                let idx = resolve!(idx, memory, store2);
+                let idx_expr = resolve!(idx, memory, store2);
                 let idx = match idx.node {
                     Node::Int(index) => index,
                     _ => {
@@ -123,7 +123,7 @@ impl Operator {
                     Node::Array(ref arr) => Ok(
                         arr.get(idx)
                             .ok_or(
-                                debug.to_string() + ", but this index does not exist in the array",
+                                idx_expr.debug.to_string() + ", but this index does not exist in the array",
                             )?
                             .clone(),
                     ),

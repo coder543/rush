@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use interpreter::ast::*;
-use interpreter::Ident;
+use interpreter::{Ident, DebugInfo};
 
 use interpreter::builtins::add_builtins;
 
@@ -24,12 +24,15 @@ pub fn run_expression(
 
     let mut expr = Expr::parse(buffer)?;
 
-    for (i, arg) in commandline.drain(..).enumerate() {
-        expr.memory.insert(
-            Ident(format!("$arg{}", i)),
-            Expr::parse_one(&arg)?,
-        );
+    let mut args = Vec::new();
+    for arg in commandline.drain(..) {
+        args.push(Expr::parse_one(&arg)?);
     }
+
+    expr.memory.insert(
+        Ident("$arg".to_string()),
+        Expr::new(Node::Array(args), DebugInfo::none()),
+    );
 
     add_builtins(&mut expr.memory);
 
