@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use interpreter::tokenizer::*;
 use interpreter::{Memory, Ident, DebugInfo};
 
@@ -110,7 +108,7 @@ impl PartialEq for Builtin {
 
 
 impl PartialOrd for Builtin {
-    fn partial_cmp(&self, other: &Builtin) -> Option<Ordering> {
+    fn partial_cmp(&self, _: &Builtin) -> Option<Ordering> {
         None
     }
 }
@@ -140,6 +138,10 @@ impl Expr {
         Ok(ast)
     }
 
+    pub fn parse_main(buffer: &str) -> Result<Expr, String> {
+        Ok(Expr::parse(buffer)?.get_main())
+    }
+
     pub fn parse_one(buffer: &str) -> Result<Expr, String> {
         let tokenizer = &mut RushTokenizer::new(buffer).peekable();
         parse_expr(tokenizer)
@@ -158,6 +160,10 @@ impl AST {
     /// calls the anonymous outer function that surrounds the result of Expr::parse
     pub fn run(&mut self) -> Result<Expr, String> {
         Expr::new(Node::Op(Box::new(Operator::Call(Ident("<anonymous>".to_string()), vec![]))), DebugInfo::none()).run(&mut self.memory)
+    }
+
+    pub fn get_main(&self) -> Expr {
+        self.memory.get(&Ident("<anonymous>".to_string())).unwrap().clone()
     }
 }
 
@@ -333,7 +339,7 @@ fn parse_fn(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String>
     let mut args = Vec::new();
     loop {
         let arg = match tokenizer.next() {
-            Some(Token::Ident(id, debug)) => id,
+            Some(Token::Ident(id, _)) => id,
             Some(Token::Operator(ref op, _)) if op == ")" => break,
             None => {
                 Err(
@@ -488,7 +494,6 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
                 _ => parse_cmd(unknown, tokenizer, debug)?,
             }
         }
-        _ => return Err("Unexpected token")?,
     })
 }
 
@@ -839,7 +844,7 @@ mod tests {
 
     #[test]
     fn parse_negate() {
-        let expr = Expr::parse("!$someBool");
+        let expr = Expr::parse_main("!$someBool");
         assert_eq!(
             expr,
             Ok(Expr {
@@ -863,7 +868,7 @@ mod tests {
 
     #[test]
     fn parse_assign() {
-        let expr = Expr::parse("$someInt = $otherInt");
+        let expr = Expr::parse_main("$someInt = $otherInt");
         assert_eq!(
             expr,
             Ok(Expr {
@@ -891,7 +896,7 @@ mod tests {
 
     #[test]
     fn parse_array_assign() {
-        let expr = Expr::parse("$someInt[3] = $otherInt");
+        let expr = Expr::parse_main("$someInt[3] = $otherInt");
         assert_eq!(
             expr,
             Ok(Expr {
@@ -922,7 +927,7 @@ mod tests {
 
     #[test]
     fn parse_array() {
-        let expr = Expr::parse("$x = [3, 2, 4]; return $x[0];");
+        let expr = Expr::parse_main("$x = [3, 2, 4]; return $x[0];");
         assert_eq!(
             expr,
             Ok(Expr {
@@ -979,7 +984,7 @@ mod tests {
 
     #[test]
     fn parse_function() {
-        let expr = Expr::parse("fn $test($otherInt) { $someInt = $otherInt; }");
+        let expr = Expr::parse_main("fn $test($otherInt) { $someInt = $otherInt; }");
         assert_eq!(
             expr,
             Ok(Expr {
@@ -1017,7 +1022,7 @@ mod tests {
 
     #[test]
     fn parse_for() {
-        let expr = Expr::parse("for $otherInt in $array { $someInt = $otherInt }");
+        let expr = Expr::parse_main("for $otherInt in $array { $someInt = $otherInt }");
         assert_eq!(
             expr,
             Ok(Expr {
@@ -1058,7 +1063,7 @@ mod tests {
 
     #[test]
     fn parse_while() {
-        let expr = Expr::parse("while $otherInt == $something { $otherInt = $someInt }");
+        let expr = Expr::parse_main("while $otherInt == $something { $otherInt = $someInt }");
         assert_eq!(
             expr,
             Ok(Expr {
@@ -1107,7 +1112,7 @@ mod tests {
 
     #[test]
     fn parse_if() {
-        let expr = Expr::parse(
+        let expr = Expr::parse_main(
             "if $otherInt == 4 { $someInt = $otherInt } else { $someInt = 3 }",
         );
         assert_eq!(
@@ -1174,7 +1179,7 @@ mod tests {
 
     #[test]
     fn parse_add() {
-        let expr = Expr::parse("$someInt + $otherInt");
+        let expr = Expr::parse_main("$someInt + $otherInt");
         assert_eq!(
             expr,
             Ok(Expr {
@@ -1204,7 +1209,7 @@ mod tests {
 
     #[test]
     fn parse_add2() {
-        let expr = Expr::parse("$someInt + $otherInt; $someInt + $otherInt;");
+        let expr = Expr::parse_main("$someInt + $otherInt; $someInt + $otherInt;");
         assert_eq!(
             expr,
             Ok(Expr {
@@ -1247,7 +1252,7 @@ mod tests {
 
     #[test]
     fn parse_sub_add() {
-        let expr = Expr::parse("$someInt - $otherInt + $neat");
+        let expr = Expr::parse_main("$someInt - $otherInt + $neat");
         assert_eq!(
             expr,
             Ok(Expr {
@@ -1286,7 +1291,7 @@ mod tests {
 
     #[test]
     fn parse_parenthetic() {
-        let expr = Expr::parse("$someInt + ($otherInt - $coolInt) / $neat");
+        let expr = Expr::parse_main("$someInt + ($otherInt - $coolInt) / $neat");
         let div = Expr {
             node: Node::Op(Box::new(Operator::Div(
                 Expr {

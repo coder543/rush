@@ -1,10 +1,5 @@
-#![allow(unused)]
-
 use interpreter::ast::*;
-use interpreter::tokenizer::*;
 use interpreter::{DebugInfo, Ident, Memory};
-
-use std::collections::HashMap;
 
 impl Expr {
     pub fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
@@ -289,21 +284,6 @@ fn scope<T, U: FnOnce(&mut Memory) -> T>(memory: &mut Memory, scoped_code: U) ->
     result
 }
 
-/// get the list of visible identifiers at this scope level
-fn get_scope(memory: &mut Memory) -> Vec<Ident> {
-    memory.keys().cloned().collect()
-}
-
-/// remove any identifiers that were created during the scoped region
-fn revert_scope(scope: Vec<Ident>, memory: &mut Memory) {
-    memory.retain(|ident, _| scope.contains(ident));
-}
-
-fn revert_scope_after<T>(val: T, scope: Vec<Ident>, memory: &mut Memory) -> T {
-    revert_scope(scope, memory);
-    val
-}
-
 fn run_exprs(exprs: &Vec<Expr>, memory: &mut Memory) -> Result<Expr, String> {
     for mut expr in exprs {
         let expr = expr.run(memory)?;
@@ -326,18 +306,16 @@ impl Function {
                     args.len()
                 ))?;
             }
-            let scope = get_scope(memory);
+
             for (id, val) in self.args.iter().zip(args) {
                 memory.insert(id.clone(), val.clone());
             }
-            for mut expr in &self.body {
-                match expr.run(memory)?.node {
-                    Node::Builtin(ref func) => return (func.0)(memory),
-                    Node::Return(ret_expr) => return Ok(*ret_expr),
-                    _ => {}
-                };
+
+            let ret = run_exprs(&self.body, memory)?;
+            match ret.node {
+                Node::Return(expr) => Ok(*expr),
+                _ => Ok(ret)
             }
-            Ok(Expr::new(Node::Noop, DebugInfo::none()))
         })
     }
 }
@@ -443,35 +421,32 @@ mod tests {
 
     #[test]
     fn walk_assign() {
-        let expr = Expr::parse("$someInt = 35").unwrap();
-        let mut memory = &mut HashMap::new();
+        let mut expr = Expr::parse("$someInt = 35").unwrap();
 
         // create $someInt outside the scope of the anonymous outer function that
         // Expr::parse returns, that way the effect of the assignment can be seen here.
-        create_global("$someInt", memory);
+        create_global("$someInt", &mut expr.memory);
 
-        let result = expr.run(memory).unwrap();
-        println!("{:#?}\n memory: {:#?}", result, memory);
+        let result = expr.run().unwrap();
+        println!("{:#?}\n memory: {:#?}", result, &expr.memory);
     }
 
     #[test]
     fn walk_assign2() {
-        let expr = Expr::parse("$otherInt = 35; $someInt = $otherInt + 2;").unwrap();
-        let mut memory = &mut HashMap::new();
+        let mut expr = Expr::parse("$otherInt = 35; $someInt = $otherInt + 2;").unwrap();
 
         // create $someInt outside the scope of the anonymous outer function that
         // Expr::parse returns, that way the effect of the assignment can be seen here.
-        create_global("$someInt", memory);
+        create_global("$someInt", &mut expr.memory);
 
-        let result = expr.run(memory).unwrap();
-        println!("{:#?}\n memory: {:#?}", result, memory);
+        let result = expr.run().unwrap();
+        println!("{:#?}\n memory: {:#?}", result, &expr.memory);
     }
 
     #[test]
     #[should_panic]
     fn walk_assign_undefined() {
-        let expr = Expr::parse("$someInt = 35; $otherInt = $someInt + $whatIsThis;").unwrap();
-        let mut memory = &mut HashMap::new();
-        let result = expr.run(memory).unwrap();
+        let mut expr = Expr::parse("$someInt = 35; $otherInt = $someInt + $whatIsThis;").unwrap();
+        let result = expr.run().unwrap();
     }
 }

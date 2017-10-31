@@ -1,5 +1,4 @@
 use std::time::Instant;
-use std::collections::HashMap;
 
 use interpreter::ast::*;
 use interpreter::Ident;
