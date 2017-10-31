@@ -123,6 +123,7 @@ pub struct RushTokenizer<'a> {
     ready_tokens: VecDeque<String>,
     pos: u64,
     last_len: u64,
+    peeked: Option<Token>,
 }
 
 impl<'a> RushTokenizer<'a> {
@@ -132,6 +133,7 @@ impl<'a> RushTokenizer<'a> {
             ready_tokens: VecDeque::new(),
             pos: 0,
             last_len: 0,
+            peeked: None,
         }
     }
 
@@ -214,6 +216,27 @@ impl<'a> RushTokenizer<'a> {
         SYM_OPS.contains(&raw_token) || WORD_OPS.contains(&raw_token)
     }
 
+    pub fn peek(&mut self) -> Option<&Token> {
+        if let Some(_) = self.peeked {
+            return self.peeked.as_ref();
+        }
+        let next = try_opt!(self.next());
+        self.peeked = Some(next);
+        return self.peeked.as_ref();
+    }
+
+    pub fn next_basic(&mut self) -> Option<Token> {
+        assert!(self.peeked.is_none(), "can't call next_basic while there is a peeked token!");
+
+        let raw_token = try_opt!(self.next_raw_token());
+
+        if let Some(ident) = self.get_ident(&raw_token) {
+            return Some(Token::Ident(ident, DebugInfo::new(raw_token, self.pos)));
+        }
+
+        Some(Token::Str(raw_token.to_string(), DebugInfo::new(raw_token, self.pos)))
+    }
+
     fn subdivide_token(&mut self, raw_token: &mut String) {
         #[cfg(test)]
         println!("token to subdivide is {}", raw_token);
@@ -247,6 +270,10 @@ impl<'a> Iterator for RushTokenizer<'a> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {
+        if let Some(token) = self.peeked.take() {
+            return Some(token);
+        }
+
         let mut raw_token = try_opt!(self.next_raw_token());
 
         self.subdivide_token(&mut raw_token);

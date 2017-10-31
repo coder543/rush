@@ -113,8 +113,7 @@ impl PartialOrd for Builtin {
     }
 }
 
-use std::iter::Peekable;
-type Tokenizer<'a> = Peekable<RushTokenizer<'a>>;
+type Tokenizer<'a> = RushTokenizer<'a>;
 
 #[allow(unused)]
 impl Expr {
@@ -125,7 +124,7 @@ impl Expr {
     // this should really return Result<AST, String>
     pub fn parse(buffer: &str) -> Result<AST, String> {
         let mut ast = AST::new();
-        let tokenizer = &mut RushTokenizer::new(buffer).peekable();
+        let tokenizer = &mut RushTokenizer::new(buffer);
         let body = parse_exprs(tokenizer, true)?;
         ast.memory.insert(Ident("<anonymous>".to_string()), Expr {
             node: Node::Function(Box::new(Function::new(
@@ -143,7 +142,7 @@ impl Expr {
     }
 
     pub fn parse_one(buffer: &str) -> Result<Expr, String> {
-        let tokenizer = &mut RushTokenizer::new(buffer).peekable();
+        let tokenizer = &mut RushTokenizer::new(buffer);
         parse_expr(tokenizer)
     }
 }
@@ -429,24 +428,22 @@ fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, 
 }
 
 fn parse_cmd(cmd: String, tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
-    let fn_name = cmd;
-
+    println!("parse_cmd: {}", cmd);
     let mut args = Vec::new();
 
     loop {
-        let expr = parse_expr(tokenizer)?;
+        let next = tokenizer.next_basic().ok_or(debug.to_string() + ", reached end of input while trying to parse command expression")?;
+        let expr = match next {
+            Token::Str(ref str_val, _) if str_val == "#" => break,
+            Token::Str(str_val, dbg) => Expr::new(Node::Str(str_val), dbg),
+            Token::Ident(id, dbg) => Expr::new(Node::Ident(id), dbg),
+            val => Err(val.get_debug_info().to_string() + ", found impossible token type while parsing command expression")?
+        };
         args.push(expr);
-        match tokenizer.next().ok_or(
-            debug.to_string() +
-                ", reached end of input while trying to parse command expression",
-        )? {
-            Token::Unknown(ref val, _) if val == "\n" => break,
-            _ => {}
-        }
     }
 
     Ok(Expr::new(
-        Node::Op(Box::new(Operator::Command(fn_name, args))),
+        Node::Op(Box::new(Operator::Command(cmd, args))),
         debug,
     ))
 }
@@ -511,6 +508,9 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
                 } else if op == "(" {
                     fn_call = true;
                 }
+            }
+            Token::Unknown(ref val, _) if val == "#" => {
+                return Ok(primary_expr)
             }
             _ => {
                 return Ok(primary_expr);
@@ -845,6 +845,40 @@ mod tests {
 
             return $factorial($arg[0]);
         "#).unwrap();
+    }
+
+    #[test]
+    fn parse_command() {
+        let expr = Expr::parse_main("df -kh $var . #");
+        assert_eq!(
+            expr,
+            Ok(Expr {
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    vec![
+                        Expr {
+                            node: Node::Op(Box::new(Operator::Command("df".to_string(), vec![
+                                Expr {
+                                    node: Node::Str("-kh".to_string()),
+                                    debug: DebugInfo::new("-kh", 3),
+                                },
+                                Expr {
+                                    node: Node::Ident(Ident("$var".to_string())),
+                                    debug: DebugInfo::new("$var", 7),
+                                },
+                                Expr {
+                                    node: Node::Str(".".to_string()),
+                                    debug: DebugInfo::new(".", 12),
+                                }
+                            ]))),
+                            debug: DebugInfo::new("df", 0),
+                        },
+                    ],
+                ))),
+                debug: DebugInfo::new("df -kh $var . #", 0),
+            })
+        );
     }
 
     #[test]
