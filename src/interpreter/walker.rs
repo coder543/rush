@@ -2,10 +2,9 @@
 
 use interpreter::ast::*;
 use interpreter::tokenizer::*;
+use interpreter::{DebugInfo, Ident, Memory};
 
 use std::collections::HashMap;
-
-pub type Memory = HashMap<Ident, Expr>;
 
 impl Expr {
     pub fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
@@ -17,7 +16,10 @@ impl Expr {
                 Ok(res)
             }
             Node::Op(ref operator) => operator.run(&self.debug, memory),
-            Node::Function(ref function) => function.run(memory, &[]),
+            Node::Function(ref function) => {
+                memory.insert(function.name.clone(), self.clone());
+                Ok(Expr::new(Node::Noop, self.debug.clone()))
+            },
             Node::If(ref if_stmt) => if_stmt.run(memory),
             Node::For(ref for_stmt) => for_stmt.run(memory),
             Node::While(ref while_stmt) => while_stmt.run(memory),
@@ -330,6 +332,7 @@ impl Function {
             }
             for mut expr in &self.body {
                 match expr.run(memory)?.node {
+                    Node::Builtin(ref func) => return (func.0)(memory),
                     Node::Return(ret_expr) => return Ok(*ret_expr),
                     _ => {}
                 };

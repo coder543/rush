@@ -1,8 +1,11 @@
 #![allow(unused)]
 
 use interpreter::tokenizer::*;
+use interpreter::{Memory, Ident, DebugInfo};
 
 use std::collections::HashMap;
+use std::cmp::Ordering;
+use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Node {
@@ -19,6 +22,7 @@ pub enum Node {
     For(Box<For>),
     While(Box<While>),
     Function(Box<Function>),
+    Builtin(Builtin),
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -83,6 +87,34 @@ pub struct Expr {
     pub debug: DebugInfo,
 }
 
+#[derive(Clone)]
+pub struct Builtin(pub fn(memory: &mut Memory) -> Result<Expr, String>);
+
+impl fmt::Display for Builtin {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "<builtin function>")
+    }
+}
+
+impl fmt::Debug for Builtin {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "<builtin function>")
+    }
+}
+
+impl PartialEq for Builtin {
+    fn eq(&self, other: &Builtin) -> bool {
+        self as *const Builtin == other as *const Builtin
+    }
+}
+
+
+impl PartialOrd for Builtin {
+    fn partial_cmp(&self, other: &Builtin) -> Option<Ordering> {
+        None
+    }
+}
+
 use std::iter::Peekable;
 type Tokenizer<'a> = Peekable<RushTokenizer<'a>>;
 
@@ -93,18 +125,19 @@ impl Expr {
     }
 
     // this should really return Result<AST, String>
-    pub fn parse(buffer: &str) -> Result<Expr, String> {
-        let ast = AST::new();
+    pub fn parse(buffer: &str) -> Result<AST, String> {
+        let mut ast = AST::new();
         let tokenizer = &mut RushTokenizer::new(buffer).peekable();
         let body = parse_exprs(tokenizer, true)?;
-        Ok(Expr {
+        ast.memory.insert(Ident("<anonymous>".to_string()), Expr {
             node: Node::Function(Box::new(Function::new(
                 Ident(String::from("<anonymous>")),
                 Vec::new(),
                 body,
             ))),
             debug: DebugInfo::new(buffer, 0),
-        })
+        });
+        Ok(ast)
     }
 
     pub fn parse_one(buffer: &str) -> Result<Expr, String> {
@@ -113,8 +146,8 @@ impl Expr {
     }
 }
 
-struct AST {
-    memory: HashMap<Ident, Expr>,
+pub struct AST {
+    pub memory: HashMap<Ident, Expr>,
 }
 
 impl AST {
@@ -123,8 +156,8 @@ impl AST {
     }
 
     /// calls the anonymous outer function that surrounds the result of Expr::parse
-    pub fn run(&self) -> Result<Node, String> {
-        Err("Not implemented yet")?
+    pub fn run(&mut self) -> Result<Expr, String> {
+        Expr::new(Node::Op(Box::new(Operator::Call(Ident("<anonymous>".to_string()), vec![]))), DebugInfo::none()).run(&mut self.memory)
     }
 }
 
@@ -370,13 +403,6 @@ fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, 
             }
         }
     }
-
-    tokenizer
-        .next()
-        .ok_or(
-            debug.to_string() + ", reached end of input while trying to parse function call",
-        )?
-        .expect_operator_specific(")")?;
 
     Ok(Expr::new(
         Node::Op(Box::new(Operator::Call(fn_name, args))),

@@ -2,7 +2,9 @@ use std::time::Instant;
 use std::collections::HashMap;
 
 use interpreter::ast::*;
-use interpreter::tokenizer::Ident;
+use interpreter::Ident;
+
+use interpreter::builtins::add_builtins;
 
 // Obviously just a rough sketch
 // These fields will need to be rethought
@@ -21,14 +23,18 @@ pub fn run_expression(
     mut commandline: Vec<String>,
 ) -> Result<ExpressionOutput, String> {
 
-    let expr = Expr::parse(buffer)?;
-    let memory = &mut HashMap::new();
+    let mut expr = Expr::parse(buffer)?;
 
     for (i, arg) in commandline.drain(..).enumerate() {
-        memory.insert(Ident(format!("$arg{}", i)), Expr::parse_one(&arg)?);
+        expr.memory.insert(
+            Ident(format!("$arg{}", i)),
+            Expr::parse_one(&arg)?,
+        );
     }
 
-    let result = expr.run(memory)?;
+    add_builtins(&mut expr.memory);
+
+    let result = expr.run()?;
 
     let output = format!("{:?}", result.node);
 
