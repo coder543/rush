@@ -431,13 +431,6 @@ fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, 
 fn parse_cmd(cmd: String, tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
     let fn_name = cmd;
 
-    tokenizer
-        .next()
-        .ok_or(
-            debug.to_string() + ", reached end of input while trying to parse command expression",
-        )?
-        .expect_operator_specific("(")?;
-
     let mut args = Vec::new();
 
     loop {
@@ -447,23 +440,10 @@ fn parse_cmd(cmd: String, tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result
             debug.to_string() +
                 ", reached end of input while trying to parse command expression",
         )? {
-            Token::Operator(ref op, _) if op == "," => {}
-            Token::Operator(ref op, _) if op == ")" => break,
-            token => {
-                Err(
-                    debug.to_string() + ", while parsing command expression, " +
-                        &token.get_debug_info().to_string(),
-                )?
-            }
+            Token::Unknown(ref val, _) if val == "\n" => break,
+            _ => {}
         }
     }
-
-    tokenizer
-        .next()
-        .ok_or(
-            debug.to_string() + ", reached end of input while trying to parse command expression",
-        )?
-        .expect_operator_specific(")")?;
 
     Ok(Expr::new(
         Node::Op(Box::new(Operator::Command(fn_name, args))),
@@ -832,16 +812,15 @@ fn parse_parenthetic_expr(
 }
 
 fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
-    // ensure that there is a semicolon at the end of this expression
-    // or, ensure that this is the final expression,
-    // by providing a fake semicolon if no token is returned at all
+    // this function currently just consumes a semicolon, if semicolon is the next token.
+    // it used to do more stuff.
 
     let fake_semicolon = Token::Operator(";".to_string(), DebugInfo::new(";".to_string(), 0));
 
     let op = match tokenizer.peek().unwrap_or_else(|| &fake_semicolon) {
         &Token::Operator(ref op, _)
-            if op == ";" || op == ")" || op == "{" || op == "}" || op == "]" => op.clone(),
-        token => return token.expect_operator_specific(";"),
+            if op == ";" => op.clone(),
+        token => String::from(""),
     };
     // use up the semicolon if it is there
     if op == ";" {
@@ -853,6 +832,18 @@ fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_factorial() {
+        let expr = Expr::parse_main(r#"fn $factorial($n) {
+    if $n == 1 {
+        return 1;
+    }
+    return $n * $factorial($n - 1);
+}
+
+return $factorial($arg[0]);"#).unwrap();
+    }
 
     #[test]
     fn parse_negate() {
