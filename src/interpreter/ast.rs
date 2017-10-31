@@ -820,7 +820,7 @@ fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
     let op = match tokenizer.peek().unwrap_or_else(|| &fake_semicolon) {
         &Token::Operator(ref op, _)
             if op == ";" => op.clone(),
-        token => String::from(""),
+        _ => String::from(""),
     };
     // use up the semicolon if it is there
     if op == ";" {
@@ -835,14 +835,16 @@ mod tests {
 
     #[test]
     fn parse_factorial() {
-        let expr = Expr::parse_main(r#"fn $factorial($n) {
-    if $n == 1 {
-        return 1;
-    }
-    return $n * $factorial($n - 1);
-}
+        Expr::parse_main(r#"
+            fn $factorial($n) {
+                if $n == 1 {
+                    return 1;
+                }
+                return $n * $factorial($n - 1);
+            }
 
-return $factorial($arg[0]);"#).unwrap();
+            return $factorial($arg[0]);
+        "#).unwrap();
     }
 
     #[test]

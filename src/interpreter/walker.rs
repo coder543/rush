@@ -88,7 +88,7 @@ impl Operator {
                 }
             }
 
-            Operator::Command(ref cmd, ref args) => unimplemented!(),
+            Operator::Command(ref cmd, ref args) => unimplemented!("{}, {:?}", cmd, args),
 
             Operator::ArrayAccess(ref arr, ref idx) => {
                 let store1;
@@ -447,6 +447,6 @@ mod tests {
     #[should_panic]
     fn walk_assign_undefined() {
         let mut expr = Expr::parse("$someInt = 35; $otherInt = $someInt + $whatIsThis;").unwrap();
-        let result = expr.run().unwrap();
+        expr.run().unwrap();
     }
 }
