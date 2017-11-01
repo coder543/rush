@@ -1,5 +1,6 @@
 use interpreter::ast::*;
 use interpreter::{DebugInfo, Ident, Memory};
+use std::process::Command;
 
 impl Expr {
     pub fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
@@ -88,7 +89,14 @@ impl Operator {
                 }
             }
 
-            Operator::Command(ref cmd, ref args) => unimplemented!("{}, {:?}", cmd, args),
+            Operator::Command(ref cmd, ref args) => {
+                let command = Command::new(cmd).output().unwrap();
+                let output = String::from_utf8_lossy(&command.stdout);
+                let output = Expr::new(Node::Str(output.to_string()), DebugInfo::none());
+                memory.insert(Ident("$output".to_string()), output.clone());
+                memory.insert(Ident("$exitCode".to_string()), Expr::new(Node::Int(command.status.code().unwrap() as i64), DebugInfo::none()));
+                Ok(output)
+            },
 
             Operator::ArrayAccess(ref arr, ref idx) => {
                 let store1;
@@ -308,7 +316,8 @@ impl Function {
             }
 
             for (id, val) in self.args.iter().zip(args) {
-                memory.insert(id.clone(), val.clone());
+                let val = val.run(memory)?;
+                memory.insert(id.clone(), val);
             }
 
             let ret = run_exprs(&self.body, memory)?;

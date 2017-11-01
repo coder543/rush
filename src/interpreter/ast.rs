@@ -251,7 +251,7 @@ fn parse_if(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String>
 
     let true_body = parse_exprs(tokenizer, false)?;
 
-    match tokenizer.next().map(|token| {
+    match tokenizer.peek().map(|token| {
         token.expect_unknown_specific("else")
     }) {
         Some(Ok(_)) => {}
@@ -267,6 +267,7 @@ fn parse_if(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String>
         }
     }
 
+    tokenizer.next();
 
     {
         let peek = match tokenizer.peek() {
@@ -492,8 +493,6 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
     #[cfg(test)]
     println!("parse_expr");
 
-    let mut fn_call = false;
-
     {
         let peek = match tokenizer.peek() {
             Some(token) => token,
@@ -505,8 +504,6 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
                     op == "]"
                 {
                     return Ok(primary_expr);
-                } else if op == "(" {
-                    fn_call = true;
                 }
             }
             Token::Unknown(ref val, _) if val == "#" => {
@@ -518,13 +515,9 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
         }
     }
 
-    if fn_call {
-        parse_fn_call(primary_expr, tokenizer)
-    } else {
-        let expr = parse_binary_operator(0, primary_expr, tokenizer)?;
-        check_for_end_of_expr(tokenizer)?;
-        Ok(expr)
-    }
+    let expr = parse_binary_operator(0, primary_expr, tokenizer)?;
+    check_for_end_of_expr(tokenizer)?;
+    Ok(expr)
 }
 
 fn parse_unary_operator(
@@ -573,6 +566,7 @@ fn op_precendence(op: &str) -> i32 {
         "-" => 30,
         "*" => 40,
         "/" | "%" => 50,
+        "(" => 60,
         "[" => 1,
         "||" => 5,
         "==" | "!=" | "&&" => 10,
@@ -657,6 +651,7 @@ fn operator_expr_from(
     ))
 }
 
+
 fn parse_binary_operator(
     last_precedence: i32,
     first_expr: Expr,
@@ -666,20 +661,34 @@ fn parse_binary_operator(
     #[cfg(test)]
     println!("parse_binary");
 
-    let next_token = tokenizer.next().ok_or(
+    let next_token = tokenizer.peek().ok_or(
         "Expected operator, found end of input",
-    )?;
+    )?.clone();
 
-    let (op, debug) = match next_token {
-        Token::Operator(op, debug) => (op, debug),
+    let (first_expr, op, debug) = match next_token {
+        Token::Operator(ref op, _) if op == "(" => {
+            let first_expr = parse_fn_call(first_expr, tokenizer)?;
+            let next_token = tokenizer.peek().ok_or(
+                "Expected operator, found end of input",
+            )?.clone();
+            match next_token {
+                Token::Operator(op, debug) => (first_expr, op, debug),
+                token => Err(token.get_debug_info().to_string() + ", expected operator.")?
+            }
+        },
+        Token::Operator(op, debug) => (first_expr, op, debug),
         _ => unimplemented!(),
     };
+
+    tokenizer.next();
 
     if op == "!" {
         return Err(
             debug.to_string() + ", but there is an expression preceding it and '" + &op +
                 "' is not a binary operator!",
         )?;
+    } else if op == ";" {
+        return Ok(first_expr);
     }
 
     let precendence = op_precendence(&op);
@@ -835,7 +844,7 @@ mod tests {
 
     #[test]
     fn parse_factorial() {
-        Expr::parse_main(r#"
+        println!("{:#?}", Expr::parse_main(r#"
             fn $factorial($n) {
                 if $n == 1 {
                     return 1;
@@ -844,7 +853,8 @@ mod tests {
             }
 
             return $factorial($arg[0]);
-        "#).unwrap();
+        "#).unwrap());
+        panic!();
     }
 
     #[test]
