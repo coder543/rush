@@ -8,34 +8,135 @@ use interpreter::ast::*;
 use interpreter::{Ident, DebugInfo};
 use interpreter::Memory;
 
-pub fn add_builtins(memory: &mut Memory) {
-    memory.insert(
-        Ident("$exit".to_string()),
-        Expr::new(
-            Node::Function(Box::new(Function {
-                name: Ident("$exit".to_string()),
-                args: vec![Ident("$exitCode".to_string())],
-                body: vec![
-                    Expr::new(Node::Builtin(Builtin(exit)), DebugInfo::new("$exit", 0)),
-                ],
-            })),
-            DebugInfo::new("$exit", 0),
-        ),
-    );
+macro_rules! register_builtin(
+    ($memory:ident, $name:ident, $($arg:ident),+) => (
+        $memory.insert(
+            Ident(concat!("$", stringify!($name)).to_string()),
+            Expr::new(
+                Node::Function(Box::new(Function {
+                    name: Ident(concat!("$", stringify!($name)).to_string()),
+                    args: vec![$(Ident(concat!("$", stringify!($arg)).to_string()))+],
+                    body: vec![
+                        Expr::new(Node::Builtin(Builtin($name)), DebugInfo::new(concat!("$", stringify!($name)), 0)),
+                    ],
+                })),
+                DebugInfo::new(concat!("$", stringify!($name)), 0),
+            ),
+        );
+    )
+);
+
+pub fn register_builtins(memory: &mut Memory) {
+    register_builtin!(memory, exit, exitCode);
+    register_builtin!(memory, echo, val);
+    register_builtin!(memory, string, val);
+    register_builtin!(memory, int, val);
+    register_builtin!(memory, float, val);
+    register_builtin!(memory, boolean, val);
 }
 
 pub fn exit(memory: &mut Memory) -> Result<Expr, String> {
-    let code = match memory.get(&Ident("$exitCode".to_string())) {
-        Some(val) => {
-            match val.node {
-                Node::Int(int) => int,
-                _ => 0,
-            }
-        }
+    let code = match memory.get(&Ident("$exitCode".to_string())).unwrap().node {
+        Node::Int(int) => int,
         _ => 0,
     };
 
     ::std::process::exit(code as i32);
+}
+
+pub fn string(memory: &mut Memory) -> Result<Expr, String> {
+    let val = memory.get(&Ident("$val".to_string())).unwrap();
+    let str_val = match val.node {
+        Node::Int(int) => int.to_string(),
+        Node::Float(float) => float.to_string(),
+        Node::Str(ref str_val) => str_val.clone(),
+        Node::Bool(bool_val) => bool_val.to_string(),
+        _ => {
+            Err(
+                val.debug.to_string() + ", which cannot be converted into a string",
+            )?
+        }
+    };
+
+    Ok(Expr::new(Node::Str(str_val), DebugInfo::none()))
+}
+
+pub fn int(memory: &mut Memory) -> Result<Expr, String> {
+    let val = memory.get(&Ident("$val".to_string())).unwrap();
+    let int_val = match val.node {
+        Node::Int(int) => int,
+        Node::Float(float) => float as i64,
+        Node::Str(ref str_val) => {
+            str_val.parse().map_err(|_| {
+                val.debug.to_string() + " with value " + str_val + " cannot be converted to an int."
+            })?
+        }
+        Node::Bool(bool_val) => if bool_val { 1 } else { 0 },
+        _ => {
+            Err(
+                val.debug.to_string() + ", which cannot be converted into an int",
+            )?
+        }
+    };
+
+    Ok(Expr::new(Node::Int(int_val), DebugInfo::none()))
+}
+
+pub fn float(memory: &mut Memory) -> Result<Expr, String> {
+    let val = memory.get(&Ident("$val".to_string())).unwrap();
+    let float_val = match val.node {
+        Node::Int(int) => int as f64,
+        Node::Float(float) => float,
+        Node::Str(ref str_val) => {
+            str_val.parse().map_err(|_| {
+                val.debug.to_string() + " with value " + str_val +
+                    " cannot be converted to a float."
+            })?
+        }
+        Node::Bool(bool_val) => if bool_val { 1.0 } else { 0.0 },
+        _ => {
+            Err(
+                val.debug.to_string() + ", which cannot be converted into a float",
+            )?
+        }
+    };
+
+    Ok(Expr::new(Node::Float(float_val), DebugInfo::none()))
+}
+
+pub fn boolean(memory: &mut Memory) -> Result<Expr, String> {
+    let val = memory.get(&Ident("$val".to_string())).unwrap();
+    let bool_val = match val.node {
+        Node::Str(ref str_val) => {
+            str_val.to_lowercase().parse().map_err(|_| {
+                val.debug.to_string() + " with value " + str_val +
+                    " cannot be converted to a boolean."
+            })?
+        }
+        Node::Bool(bool_val) => bool_val,
+        _ => {
+            Err(
+                val.debug.to_string() + ", which cannot be converted into a boolean",
+            )?
+        }
+    };
+
+    Ok(Expr::new(Node::Bool(bool_val), DebugInfo::none()))
+}
+
+pub fn echo(memory: &mut Memory) -> Result<Expr, String> {
+    let val = memory.get(&Ident("$val".to_string())).unwrap();
+    let str_val = match val.node {
+        Node::Int(int) => int.to_string(),
+        Node::Float(float) => float.to_string(),
+        Node::Str(ref str_val) => str_val.clone(),
+        Node::Bool(bool_val) => bool_val.to_string(),
+        ref node => format!("{:#?}", node),
+    };
+
+    println!("{}", str_val);
+
+    Ok(Expr::new(Node::Noop, DebugInfo::none()))
 }
 
 // pub fn echo(buffer: &str, args: Vec<&str>) -> Result<ExpressionOutput, String> {

@@ -174,15 +174,18 @@ impl<'a> RushTokenizer<'a> {
         let mut next_token = raw_token.clone();
         loop {
             if next_token.contains('"') {
-                if next_token.ends_with('"') {
-                    raw_token.pop();
-                    let strlit = raw_token.clone();
-                    raw_token = ["\"", &raw_token, "\""].concat();
-                    let debug = DebugInfo::new(raw_token, position);
-                    return Some(Token::Str(strlit, debug));
-                } else {
-                    return None;
+                if !next_token.ends_with('"') {
+                    let quote_pos = raw_token.find('"').unwrap() + 1;
+                    let new = String::from(&raw_token[quote_pos..]);
+                    self.last_len -= new.len() as u64 + 1;
+                    self.ready_tokens.push_front(new);
+                    raw_token = String::from(&raw_token[..quote_pos]);
                 }
+                raw_token.pop();
+                let strlit = raw_token.clone();
+                raw_token = ["\"", &raw_token, "\""].concat();
+                let debug = DebugInfo::new(raw_token, position);
+                return Some(Token::Str(strlit, debug));
             }
             next_token = try_opt!(self.next_raw_token());
             raw_token.push(' ');
@@ -226,7 +229,10 @@ impl<'a> RushTokenizer<'a> {
     }
 
     pub fn next_basic(&mut self) -> Option<Token> {
-        assert!(self.peeked.is_none(), "can't call next_basic while there is a peeked token!");
+        assert!(
+            self.peeked.is_none(),
+            "can't call next_basic while there is a peeked token!"
+        );
 
         let raw_token = try_opt!(self.next_raw_token());
 
@@ -234,7 +240,10 @@ impl<'a> RushTokenizer<'a> {
             return Some(Token::Ident(ident, DebugInfo::new(raw_token, self.pos)));
         }
 
-        Some(Token::Str(raw_token.to_string(), DebugInfo::new(raw_token, self.pos)))
+        Some(Token::Str(
+            raw_token.to_string(),
+            DebugInfo::new(raw_token, self.pos),
+        ))
     }
 
     fn subdivide_token(&mut self, raw_token: &mut String) {
@@ -256,9 +265,8 @@ impl<'a> RushTokenizer<'a> {
                     if new.len() == 0 {
                         return;
                     }
-                    self.last_len -= new.len() as u64;
+                    self.last_len -= new.len() as u64 + 1;
                     self.ready_tokens.push_front(new);
-                    self.last_len -= 1;
                     return;
                 }
             }
@@ -386,6 +394,22 @@ mod tests {
                 "does this work?".to_string(),
                 DebugInfo::new("\"does this work?\"", 0),
             ))
+        );
+    }
+
+    #[test]
+    fn tokenize_string2() {
+        let mut tokenizer = RushTokenizer::new("\"hello test\")");
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Str(
+                "hello test".to_string(),
+                DebugInfo::new("\"hello test\"", 0),
+            ))
+        );
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Operator(")".to_string(), DebugInfo::new(")", 12)))
         );
     }
 

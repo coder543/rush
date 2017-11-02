@@ -1,6 +1,7 @@
 use interpreter::ast::*;
 use interpreter::{DebugInfo, Ident, Memory};
 use std::process::Command;
+use std::ffi::OsString;
 
 impl Expr {
     pub fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
@@ -15,7 +16,7 @@ impl Expr {
             Node::Function(ref function) => {
                 memory.insert(function.name.clone(), self.clone());
                 Ok(Expr::new(Node::Noop, self.debug.clone()))
-            },
+            }
             Node::If(ref if_stmt) => if_stmt.run(memory),
             Node::For(ref for_stmt) => for_stmt.run(memory),
             Node::While(ref while_stmt) => while_stmt.run(memory),
@@ -90,13 +91,34 @@ impl Operator {
             }
 
             Operator::Command(ref cmd, ref args) => {
-                let command = Command::new(cmd).output().unwrap();
+                let mut cmd_args = Vec::new();
+                for arg_expr in args {
+                    let val = arg_expr.run(memory)?;
+                    let arg = match val.node {
+                        Node::Str(str_val) => Ok(str_val),
+                        Node::Int(int) => Ok(int.to_string()),
+                        Node::Float(float) => Ok(float.to_string()),
+                        Node::Bool(bool_val) => Ok(bool_val.to_string()),
+                        _ => Err(
+                            debug.to_string() +
+                                ", but an argument cannot be converted to a string: " +
+                                &val.debug.to_string(),
+                        ),
+                    }?;
+                    cmd_args.push(OsString::from(arg));
+                }
+                let command = Command::new(cmd).args(cmd_args).output().unwrap();
                 let output = String::from_utf8_lossy(&command.stdout);
                 let output = Expr::new(Node::Str(output.to_string()), DebugInfo::none());
-                memory.insert(Ident("$output".to_string()), output.clone());
-                memory.insert(Ident("$exitCode".to_string()), Expr::new(Node::Int(command.status.code().unwrap() as i64), DebugInfo::none()));
+                memory.insert(
+                    Ident("$exitCode".to_string()),
+                    Expr::new(
+                        Node::Int(command.status.code().unwrap() as i64),
+                        DebugInfo::none(),
+                    ),
+                );
                 Ok(output)
-            },
+            }
 
             Operator::ArrayAccess(ref arr, ref idx) => {
                 let store1;
@@ -131,7 +153,8 @@ impl Operator {
                     Node::Array(ref arr) => Ok(
                         arr.get(idx)
                             .ok_or(
-                                idx_expr.debug.to_string() + ", but this index does not exist in the array",
+                                idx_expr.debug.to_string() +
+                                    ", but this index does not exist in the array",
                             )?
                             .clone(),
                     ),
@@ -296,6 +319,7 @@ fn run_exprs(exprs: &Vec<Expr>, memory: &mut Memory) -> Result<Expr, String> {
     for mut expr in exprs {
         let expr = expr.run(memory)?;
         match expr.node {
+            Node::Builtin(builtin) => return (builtin.0)(memory),
             Node::Return(_) => return Ok(expr),
             _ => {}
         };
@@ -323,7 +347,7 @@ impl Function {
             let ret = run_exprs(&self.body, memory)?;
             match ret.node {
                 Node::Return(expr) => Ok(*expr),
-                _ => Ok(ret)
+                _ => Ok(ret),
             }
         })
     }

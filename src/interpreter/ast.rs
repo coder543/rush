@@ -126,14 +126,17 @@ impl Expr {
         let mut ast = AST::new();
         let tokenizer = &mut RushTokenizer::new(buffer);
         let body = parse_exprs(tokenizer, true)?;
-        ast.memory.insert(Ident("<anonymous>".to_string()), Expr {
-            node: Node::Function(Box::new(Function::new(
-                Ident(String::from("<anonymous>")),
-                Vec::new(),
-                body,
-            ))),
-            debug: DebugInfo::new(buffer, 0),
-        });
+        ast.memory.insert(
+            Ident("<anonymous>".to_string()),
+            Expr {
+                node: Node::Function(Box::new(Function::new(
+                    Ident(String::from("<anonymous>")),
+                    Vec::new(),
+                    body,
+                ))),
+                debug: DebugInfo::new(buffer, 0),
+            },
+        );
         Ok(ast)
     }
 
@@ -158,11 +161,19 @@ impl AST {
 
     /// calls the anonymous outer function that surrounds the result of Expr::parse
     pub fn run(&mut self) -> Result<Expr, String> {
-        Expr::new(Node::Op(Box::new(Operator::Call(Ident("<anonymous>".to_string()), vec![]))), DebugInfo::none()).run(&mut self.memory)
+        Expr::new(
+            Node::Op(Box::new(
+                Operator::Call(Ident("<anonymous>".to_string()), vec![]),
+            )),
+            DebugInfo::none(),
+        ).run(&mut self.memory)
     }
 
     pub fn get_main(&self) -> Expr {
-        self.memory.get(&Ident("<anonymous>".to_string())).unwrap().clone()
+        self.memory
+            .get(&Ident("<anonymous>".to_string()))
+            .unwrap()
+            .clone()
     }
 }
 
@@ -376,6 +387,8 @@ fn parse_fn(tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String>
 }
 
 fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, String> {
+    #[cfg(test)]
+    println!("parse_fn_call");
     let fn_name = match primary_expr.node {
         Node::Ident(id) => id,
         _ => Err("The function name must be a simple identifier.")?,
@@ -397,13 +410,14 @@ fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, 
             ", reached end of input while trying to parse function call",
     )? {
         &Token::Operator(ref op, _) if op == ")" => false,
-        _ => true
+        _ => true,
     };
 
     if has_args {
         loop {
             let expr = parse_expr(tokenizer)?;
             args.push(expr);
+
             match tokenizer.next().ok_or(
                 debug.to_string() +
                     ", reached end of input while trying to parse function call",
@@ -429,16 +443,31 @@ fn parse_fn_call(primary_expr: Expr, tokenizer: &mut Tokenizer) -> Result<Expr, 
 }
 
 fn parse_cmd(cmd: String, tokenizer: &mut Tokenizer, debug: DebugInfo) -> Result<Expr, String> {
+    #[cfg(test)]
     println!("parse_cmd: {}", cmd);
     let mut args = Vec::new();
 
     loop {
-        let next = tokenizer.next_basic().ok_or(debug.to_string() + ", reached end of input while trying to parse command expression")?;
+        let next = tokenizer.next_basic().ok_or(
+            debug.to_string() +
+                ", reached end of input while trying to parse command expression",
+        )?;
         let expr = match next {
             Token::Str(ref str_val, _) if str_val == "#" => break,
+            Token::Str(ref str_val, ref dbg)
+                if str_val.starts_with("$") && str_val.contains("[") => {
+                Err(
+                    dbg.to_string() + ", array indexing is not supported in command calls yet.",
+                )?
+            }
             Token::Str(str_val, dbg) => Expr::new(Node::Str(str_val), dbg),
             Token::Ident(id, dbg) => Expr::new(Node::Ident(id), dbg),
-            val => Err(val.get_debug_info().to_string() + ", found impossible token type while parsing command expression")?
+            val => {
+                Err(
+                    val.get_debug_info().to_string() +
+                        ", found impossible token type while parsing command expression",
+                )?
+            }
         };
         args.push(expr);
     }
@@ -506,9 +535,7 @@ fn parse_expr(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
                     return Ok(primary_expr);
                 }
             }
-            Token::Unknown(ref val, _) if val == "#" => {
-                return Ok(primary_expr)
-            }
+            Token::Unknown(ref val, _) if val == "#" => return Ok(primary_expr),
             _ => {
                 return Ok(primary_expr);
             }
@@ -600,13 +627,23 @@ fn operator_expr_from(
             "=" => {
                 match first_expr.node {
                     Node::Ident(id) => Operator::Assign(id, None, next_expr),
-                    Node::Op(ref operator) => match operator.as_ref() {
-                        &Operator::ArrayAccess(ref arr, ref idx) => match arr.node {
-                            Node::Ident(ref arr_id) =>  Operator::Assign(arr_id.clone(), Some(idx.clone()), next_expr),
+                    Node::Op(ref operator) => {
+                        match operator.as_ref() {
+                            &Operator::ArrayAccess(ref arr, ref idx) => {
+                                match arr.node {
+                                    Node::Ident(ref arr_id) => {
+                                        Operator::Assign(
+                                            arr_id.clone(),
+                                            Some(idx.clone()),
+                                            next_expr,
+                                        )
+                                    }
+                                    _ => unimplemented!(),
+                                }
+                            }
                             _ => unimplemented!(),
                         }
-                        _ => unimplemented!(),
-                    },
+                    }
                     _ => {
                         Err(
                             first_expr.debug.to_string() +
@@ -623,15 +660,13 @@ fn operator_expr_from(
                             ", encountered end of input while parsing array access operator",
                     )?
                     .expect_operator_specific("]")?;
-                let assignment = match tokenizer
-                    .peek()
-                    .ok_or(
-                        debug.to_string() +
-                            ", encountered end of input while parsing array access operator",
-                    )? {
-                        &Token::Operator(ref op, _) if op == "=" => true,
-                        _ => false,
-                    };
+                let assignment = match tokenizer.peek().ok_or(
+                    debug.to_string() +
+                        ", encountered end of input while parsing array access operator",
+                )? {
+                    &Token::Operator(ref op, _) if op == "=" => true,
+                    _ => false,
+                };
                 let res = Operator::ArrayAccess(first_expr, next_expr);
                 if assignment {
                     let res = Expr::new(Node::Op(Box::new(res)), debug.clone());
@@ -651,7 +686,6 @@ fn operator_expr_from(
     ))
 }
 
-
 fn parse_binary_operator(
     last_precedence: i32,
     first_expr: Expr,
@@ -661,21 +695,24 @@ fn parse_binary_operator(
     #[cfg(test)]
     println!("parse_binary");
 
-    let next_token = tokenizer.peek().ok_or(
-        "Expected operator, found end of input",
-    )?.clone();
+    let next_token = tokenizer
+        .peek()
+        .ok_or("Expected operator, found end of input")?
+        .clone();
 
     let (first_expr, op, debug) = match next_token {
         Token::Operator(ref op, _) if op == "(" => {
             let first_expr = parse_fn_call(first_expr, tokenizer)?;
-            let next_token = tokenizer.peek().ok_or(
-                "Expected operator, found end of input",
-            )?.clone();
+            let next_token = tokenizer
+                .peek()
+                .ok_or("Expected operator, found end of input")?
+                .clone();
             match next_token {
+                Token::Operator(ref op, _) if op == ")" => return Ok(first_expr),
                 Token::Operator(op, debug) => (first_expr, op, debug),
-                token => Err(token.get_debug_info().to_string() + ", expected operator.")?
+                token => Err(token.get_debug_info().to_string() + ", expected operator.")?,
             }
-        },
+        }
         Token::Operator(op, debug) => (first_expr, op, debug),
         _ => unimplemented!(),
     };
@@ -827,8 +864,7 @@ fn check_for_end_of_expr(tokenizer: &mut Tokenizer) -> Result<(), String> {
     let fake_semicolon = Token::Operator(";".to_string(), DebugInfo::new(";".to_string(), 0));
 
     let op = match tokenizer.peek().unwrap_or_else(|| &fake_semicolon) {
-        &Token::Operator(ref op, _)
-            if op == ";" => op.clone(),
+        &Token::Operator(ref op, _) if op == ";" => op.clone(),
         _ => String::from(""),
     };
     // use up the semicolon if it is there
@@ -844,7 +880,10 @@ mod tests {
 
     #[test]
     fn parse_factorial() {
-        println!("{:#?}", Expr::parse_main(r#"
+        println!(
+            "{:#?}",
+            Expr::parse_main(
+                r#"
             fn $factorial($n) {
                 if $n == 1 {
                     return 1;
@@ -852,9 +891,22 @@ mod tests {
                 return $n * $factorial($n - 1);
             }
 
-            return $factorial($arg[0]);
-        "#).unwrap());
-        panic!();
+            return $factorial($int($arg[0]));
+        "#,
+            ).unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_inline_command() {
+        println!(
+            "{:#?}",
+            Expr::parse_main(
+                r#"
+$echo("hello test");
+        "#,
+            ).unwrap()
+        );
     }
 
     #[test]
@@ -868,20 +920,23 @@ mod tests {
                     Vec::new(),
                     vec![
                         Expr {
-                            node: Node::Op(Box::new(Operator::Command("df".to_string(), vec![
-                                Expr {
-                                    node: Node::Str("-kh".to_string()),
-                                    debug: DebugInfo::new("-kh", 3),
-                                },
-                                Expr {
-                                    node: Node::Ident(Ident("$var".to_string())),
-                                    debug: DebugInfo::new("$var", 7),
-                                },
-                                Expr {
-                                    node: Node::Str(".".to_string()),
-                                    debug: DebugInfo::new(".", 12),
-                                }
-                            ]))),
+                            node: Node::Op(Box::new(Operator::Command(
+                                "df".to_string(),
+                                vec![
+                                    Expr {
+                                        node: Node::Str("-kh".to_string()),
+                                        debug: DebugInfo::new("-kh", 3),
+                                    },
+                                    Expr {
+                                        node: Node::Ident(Ident("$var".to_string())),
+                                        debug: DebugInfo::new("$var", 7),
+                                    },
+                                    Expr {
+                                        node: Node::Str(".".to_string()),
+                                        debug: DebugInfo::new(".", 12),
+                                    },
+                                ],
+                            ))),
                             debug: DebugInfo::new("df", 0),
                         },
                     ],

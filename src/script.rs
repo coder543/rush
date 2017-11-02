@@ -10,7 +10,11 @@ pub fn run_file(path: &str, args: Vec<String>) {
         .unwrap();
     let result = run_expression(&script, args);
     match result {
-        Ok(result) => println!("{}", result.stdout),
+        Ok(result) => {
+            if result.stdout != "" {
+                println!("{}", result.stdout)
+            }
+        }
         Err(error) => println!("Error running script: {}", error),
     }
 }
