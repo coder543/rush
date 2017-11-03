@@ -64,7 +64,15 @@ pub fn run_expression(
     register_builtins(&mut expr.memory);
 
     let started = Instant::now();
-    let result = expr.run()?;
+    let result = match ::std::panic::catch_unwind(move || expr.run()) {
+        Ok(result) => result?,
+        Err(cause) => {
+            if let Some(ref cause) = cause.downcast_ref::<String>() {
+                Err(cause.to_string())?
+            }
+            panic!(cause);
+        }
+    };
     let completed = Instant::now();
 
     let output = format!("{:?}", result.node);
