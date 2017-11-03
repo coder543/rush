@@ -152,14 +152,8 @@ pub fn panic(memory: &mut Memory) -> Result<Expr, String> {
 }
 
 pub fn type_of(memory: &mut Memory) -> Result<Expr, String> {
-    let val = { 
-        let val = memory.get(&Ident("$val".to_string()));
-        if val.is_none() {
-            return Ok(Expr::new(Node::Str("undefined".to_string()), DebugInfo::none()));
-        }
-        val.unwrap().clone()
-    };
-    let str_val = match val.run(memory)?.node {
+    let val = Ident("$val".to_string()).run(&mut DebugInfo::none(), memory)?;
+    let str_val = match val.node {
         Node::Int(_) => "int".to_string(),
         Node::Float(_) => "float".to_string(),
         Node::Str(_) => "string".to_string(),

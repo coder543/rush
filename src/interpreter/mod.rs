@@ -65,7 +65,7 @@ impl Ident {
         }
 
         for c in chars {
-            if !c.is_alphabetic() && !c.is_numeric() {
+            if !c.is_alphabetic() && !c.is_numeric() && c != '_' {
                 return None;
             }
         }
