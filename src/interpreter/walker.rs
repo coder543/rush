@@ -26,7 +26,7 @@ impl Expr {
 }
 
 impl Ident {
-    fn run(&self, debug: &DebugInfo, memory: &mut Memory) -> Result<Expr, String> {
+    pub fn run(&self, debug: &DebugInfo, memory: &mut Memory) -> Result<Expr, String> {
         memory
             .get(self)
             .ok_or_else(|| {
@@ -76,7 +76,7 @@ macro_rules! do_binary_op {
 }
 
 impl Operator {
-    fn run(&self, debug: &DebugInfo, memory: &mut Memory) -> Result<Expr, String> {
+    pub fn run(&self, debug: &DebugInfo, memory: &mut Memory) -> Result<Expr, String> {
         match *self {
             Operator::Call(ref id, ref args) => {
                 match id.run(debug, memory)?.node {
@@ -328,7 +328,7 @@ fn run_exprs(exprs: &Vec<Expr>, memory: &mut Memory) -> Result<Expr, String> {
 }
 
 impl Function {
-    fn run(&self, memory: &mut Memory, args: &[Expr]) -> Result<Expr, String> {
+    pub fn run(&self, memory: &mut Memory, args: &[Expr]) -> Result<Expr, String> {
         scope(memory, |memory| {
             if self.args.len() != args.len() {
                 return Err(format!(
@@ -354,7 +354,7 @@ impl Function {
 }
 
 impl If {
-    fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
+    pub fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
         let conditional = self.condition.run(memory)?;
         let conditional = match conditional.node {
             Node::Bool(bool_val) => bool_val,
@@ -375,7 +375,7 @@ impl If {
 }
 
 impl For {
-    fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
+    pub fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
         loop {
             let val = scope(memory, |memory| self.iterator.run(memory))?;
             match val.node {
@@ -405,7 +405,7 @@ impl For {
 }
 
 impl While {
-    fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
+    pub fn run(&self, memory: &mut Memory) -> Result<Expr, String> {
         loop {
             let conditional = scope(memory, |memory| self.condition.run(memory))?;
             let conditional = match conditional.node {

@@ -41,6 +41,7 @@ pub fn run_expression(
             key.to_string_lossy().to_string(),
             value.to_string_lossy().to_string(),
         );
+        let key = "$".to_string() + &key;
         if key == "$PATH" {
             let values = value
                 .split(":")
