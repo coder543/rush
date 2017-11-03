@@ -74,6 +74,8 @@ pub fn run_expression(
         output
     };
 
+    println!("processing took {:?}", completed - started);
+
     Ok(ExpressionOutput {
         started,
         completed,
