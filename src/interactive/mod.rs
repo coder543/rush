@@ -1,6 +1,15 @@
+use std::time::Instant;
+use std::sync::mpsc::{Receiver, Sender, channel};
+
 use pancurses::{Input, Window};
 use errext::{ErrExt, PResult};
 use interpreter::command::run_expression;
+
+pub mod recorder;
+pub mod uploader;
+
+use self::recorder::Recorder;
+use self::uploader::Uploader;
 
 fn print_buffer(screen: &Window, buffer: &str) -> PResult {
     let height = (screen.get_max_y() - 3) as usize;
@@ -70,4 +79,39 @@ pub fn input_loop(screen: &Window) -> PResult {
             }
         }
     }
+}
+
+pub struct Record {
+    pub text: String,
+    pub time: Instant,
+}
+
+impl Record {
+    pub fn new(text: String) -> Record {
+        Record {
+            text,
+            time: Instant::now(),
+        }
+    }
+}
+
+pub enum Message {
+    StdOut(Record),
+    StdErr(Record),
+    StdIn(Record),
+    NewRecorder(Receiver<Message>),
+}
+
+pub fn make_channel() -> (Uploader, Recorder) {
+    let (uplink, downlink) = channel();
+    let uploader = Uploader { uplink };
+
+    let recorder = Recorder {
+        stdout: vec![],
+        stderr: vec![],
+        stdin: vec![],
+        downlink,
+    };
+
+    (uploader, recorder)
 }
