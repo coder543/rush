@@ -1,4 +1,4 @@
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::Receiver;
 use interactive::{Record, Message};
 
 pub struct Recorder {
