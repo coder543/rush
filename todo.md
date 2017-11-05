@@ -1,0 +1,11 @@
+- for loops are currently broken because iterators are not a thing yet
+- add more builtins, especially related to getting file properties and reading/writing files
+- the interactive shell needs to be rewritten almost entirely
+	- each command will run on a separate thread, transmitting output back through a channel
+	- this means that all commands will be asynchronous
+	- commands can run until they choose to exit or the user kills them
+	- since output is directed over unique channels for each process, updated output from a particular process will be able to be output to the correct location
+	- the interactive shell...
+		- currently does not understand wide characters like tabs, which means text is allowed to overflow the right-hand side and cause a crash
+		- does not support scrolling or even showing only the latest output, it just shows the earliest output
+		- needs to support inline input fields, buttons, scrollbars, and other exciting things

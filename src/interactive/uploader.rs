@@ -18,6 +18,10 @@ impl Uploader {
             .unwrap();
     }
 
+    // this function might need to be inverted...
+    // it should probably block the shell script that is running
+    // until the user provides input, which can then be passed to the
+    // shell script that requested it.
     pub fn stdin<IntoString: Into<String>>(&self, text: IntoString) {
         self.uplink
             .send(Message::StdIn(Record::new(text.into())))

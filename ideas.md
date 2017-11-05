@@ -18,6 +18,7 @@
 	- if you `ls` a directory, updates to that directory should rewrite the previous output of `ls`. maybe this should require a flag.
 - have a TUI file browser built-in
 
+```
 $files = ls
 $num = len $files
 if $num > 3 {
@@ -27,5 +28,6 @@ if $num > 3 {
 } else {
 	echo "lame folder here"
 }
+```
 
 or maybe commands should be treated as function calls? like `echo("does this work?")`
