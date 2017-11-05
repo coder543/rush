@@ -1,5 +1,7 @@
 - for loops are currently broken because iterators are not a thing yet
 - add more builtins, especially related to getting file properties and reading/writing files
+- need to be able to pipe commands into other commands, probably
+- need to be able to send signals to child processes
 - untested, but I'm pretty confident that there is a hole in the variable scoping logic where the current scope is transferred into function calls
 - need to add a break statement
 - need to test that the AST parser doesn't choke on the lack of a semicolon in most places
