@@ -15,7 +15,7 @@ macro_rules! register_builtin(
             Expr::new(
                 Node::Function(Box::new(Function {
                     name: Ident(concat!("$", stringify!($name)).to_string()),
-                    args: vec![$(Ident(concat!("$", stringify!($arg)).to_string()))+],
+                    args: vec![$(Ident(concat!("$", stringify!($arg)).to_string()),)+],
                     body: vec![
                         Expr::new(Node::Builtin(Builtin($name)), DebugInfo::new(concat!("$", stringify!($name)), 0)),
                     ],
@@ -36,6 +36,7 @@ pub fn register_builtins(memory: &mut Memory) {
     register_builtin!(memory, int, val);
     register_builtin!(memory, float, val);
     register_builtin!(memory, boolean, val);
+    register_builtin!(memory, push, array, val);
 }
 
 pub fn exit(memory: &mut Memory) -> Result<Expr, String> {
@@ -179,6 +180,21 @@ pub fn len(memory: &mut Memory) -> Result<Expr, String> {
     };
 
     Ok(Expr::new(Node::Int(arr_len as i64), DebugInfo::none()))
+}
+
+pub fn push(memory: &mut Memory) -> Result<Expr, String> {
+    let mut val = Ident("$val".to_string()).run(&mut DebugInfo::none(), memory)?;
+    let mut arr = Ident("$array".to_string()).run(&mut DebugInfo::none(), memory)?;
+    match arr.node {
+        Node::Array(ref mut arr) => arr.push(val),
+        _ => {
+            Err(
+                arr.debug.to_string() + ", which is not an array",
+            )?
+        }
+    };
+
+    Ok(arr)
 }
 
 // pub fn echo(buffer: &str, args: Vec<&str>) -> Result<ExpressionOutput, String> {
