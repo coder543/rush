@@ -29,8 +29,9 @@ macro_rules! register_builtin(
 pub fn register_builtins(memory: &mut Memory) {
     register_builtin!(memory, exit, exitCode);
     register_builtin!(memory, echo, val);
-    register_builtin!(memory, panic, val);
+    register_builtin!(memory, panic, msg);
     register_builtin!(memory, type_of, val);
+    register_builtin!(memory, len, array);
     register_builtin!(memory, string, val);
     register_builtin!(memory, int, val);
     register_builtin!(memory, float, val);
@@ -142,7 +143,7 @@ pub fn echo(memory: &mut Memory) -> Result<Expr, String> {
 }
 
 pub fn panic(memory: &mut Memory) -> Result<Expr, String> {
-    let val = Ident("$val".to_string()).run(&mut DebugInfo::none(), memory)?;
+    let val = Ident("$msg".to_string()).run(&mut DebugInfo::none(), memory)?;
     let str_val = match val.node {
         Node::Str(ref str_val) => str_val.clone(),
         ref node => format!("{:#?}", node),
@@ -164,6 +165,20 @@ pub fn type_of(memory: &mut Memory) -> Result<Expr, String> {
     };
     
     Ok(Expr::new(Node::Str(str_val), DebugInfo::none()))
+}
+
+pub fn len(memory: &mut Memory) -> Result<Expr, String> {
+    let val = Ident("$array".to_string()).run(&mut DebugInfo::none(), memory)?;
+    let arr_len = match val.node {
+        Node::Array(ref arr) => arr.len(),
+        _ => {
+            Err(
+                val.debug.to_string() + ", which does not have a length",
+            )?
+        }
+    };
+
+    Ok(Expr::new(Node::Int(arr_len as i64), DebugInfo::none()))
 }
 
 // pub fn echo(buffer: &str, args: Vec<&str>) -> Result<ExpressionOutput, String> {
