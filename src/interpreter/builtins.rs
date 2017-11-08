@@ -162,6 +162,7 @@ pub fn type_of(memory: &mut Memory) -> Result<Expr, String> {
         Node::Bool(_) => "boolean".to_string(),
         Node::Array(_) => "array".to_string(),
         Node::Function(_) => "function".to_string(),
+        Node::Noop => "undefined".to_string(),
         ref node => format!("{:#?}", node),
     };
     

@@ -1,12 +1,12 @@
 - for loops are currently broken because iterators are not a thing yet
 - add more builtins, especially related to getting file properties and reading/writing files
 - need to be able to pipe commands into other commands, probably
+- support background tasks
 - be able to send signals to child processes
 - add a break statement
 - provide some way to catch errors/panics
 - replace character numbers with line and column
 	- since the buffer for the script exists for the whole time the AST does anyways, maybe we don't need "raw"?
-- maybe make undefined variables have some kind of null value rather than panicking?
 - test that the AST parser doesn't choke on the lack of a semicolon in most places
 - untested, but I'm pretty confident that there is a hole in the variable scoping logic where the current scope is transferred into function calls
 - the interactive shell needs to be rewritten almost entirely

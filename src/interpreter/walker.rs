@@ -27,12 +27,10 @@ impl Expr {
 
 impl Ident {
     pub fn run(&self, debug: &DebugInfo, memory: &mut Memory) -> Result<Expr, String> {
-        memory
+        Ok(memory
             .get(self)
-            .ok_or_else(|| {
-                debug.to_string() + ", but " + &self.0 + " has not been defined yet."
-            })
             .map(|val| val.clone())
+            .unwrap_or_else(|| Expr::new(Node::Noop, DebugInfo::none())))
     }
 }
 
@@ -48,7 +46,19 @@ macro_rules! resolve {
             Node::Str(_) => $exp,
             Node::Bool(_) => $exp,
             Node::Array(_) => $exp,
-            _ => {$store = $exp.run($memory)?; &$store}
+            Node::Noop => {
+                Err($exp.debug.to_string() + ", but its value is undefined.")?
+            }
+            _ => {
+                $store = $exp.run($memory)?;
+                match $store.node {
+                    Node::Noop => {
+                        Err($exp.debug.to_string() + ", but its value is undefined.")?
+                    }
+                    _ => {}
+                }
+                &$store
+            }
         }
     )
 }
@@ -70,6 +80,12 @@ macro_rules! do_binary_op {
                     Ok(Expr::new(Node::$asType2(val1 $op val2), DebugInfo::none()))
                 },
             )*
+            (&Node::Noop, _) => {
+                Err($left.debug.to_string() + ", but the result is undefined.")?
+            }
+            (_, &Node::Noop) => {
+                Err($right.debug.to_string() + ", but the result is undefined.")?
+            }
             _ => $defaultCase,
         }
     })
