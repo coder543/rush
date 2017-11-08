@@ -445,6 +445,7 @@ impl While {
                 };
                 match result.node {
                     Node::Return(_) => Some(Ok(result)),
+                    Node::Break(expr) => Some(Ok(*expr)),
                     _ => None,
                 }
             });

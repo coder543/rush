@@ -15,6 +15,7 @@ pub enum Node {
     Str(String),
     Array(Vec<Expr>),
     Return(Box<Expr>),
+    Break(Box<Expr>),
     Op(Box<Operator>),
     If(Box<If>),
     For(Box<For>),
@@ -510,6 +511,7 @@ fn parse_primary(tokenizer: &mut Tokenizer) -> Result<Expr, String> {
                 "if" => parse_if(tokenizer, debug)?,
                 "fn" => parse_fn(tokenizer, debug)?,
                 "return" => Expr::new(Node::Return(Box::new(parse_expr(tokenizer)?)), debug),
+                "break" => Expr::new(Node::Break(Box::new(parse_expr(tokenizer)?)), debug),
                 _ => parse_cmd(unknown, tokenizer, debug)?,
             }
         }
