@@ -991,7 +991,7 @@ $echo("hello test");
                                     debug: DebugInfo::new("$otherInt", 11),
                                 },
                             ))),
-                            debug: DebugInfo::new("=", 9),
+                            debug: DebugInfo::new("=", 8),
                         },
                     ],
                 ))),
